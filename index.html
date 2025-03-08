@@ -3,18 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Unicorn Fart Game</title>
+    <title>Unicorn Fart Dust Game</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div id="gameContainer">
-        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        <div id="welcome">
+            <img src="assets/unicorn.png" alt="Farting Unicorn">
+            <h1>Welcome to Unicorn Fart Dust Game!</h1>
+            <p>Click unicorn to fart dust! Tap dust for points. Mute (M), leaderboard (L), wait 3s for my fart track!</p>
+            <p>Raw MVP—bigger dust, $UFD buzz—community fart fun ahead!</p>
+            <p>More at <a href="https://unicornfartdust.com" target="_blank">unicornfartdust.com</a></p>
+            <button onclick="document.getElementById('welcome').style.display = 'none';">Click to Fart!</button>
+        </div>
+        <canvas id="gameCanvas"></canvas>
         <div id="controls">
             <button id="darkModeToggle">Toggle Dark Mode</button>
             <a href="https://unicornfartdust.com" target="_blank" id="websiteLink">Visit UnicornFartDust.com</a>
         </div>
     </div>
     <audio id="soundEffects" src="assets/soundtrack.mp3" preload="auto"></audio>
+    <audio id="trumpet" src="assets/trumpet.wav"></audio>
     <script src="game.js"></script>
 </body>
 </html>
