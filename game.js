@@ -10,6 +10,11 @@ let musicStarted = false;
 
 backgroundMusic.addEventListener('play', () => console.log('Music playing'));
 backgroundMusic.addEventListener('error', (e) => console.error('Music error:', e));
+backgroundMusic.addEventListener('timeupdate', () => {
+    if (backgroundMusic.currentTime >= backgroundMusic.duration - 0.1) {
+        backgroundMusic.currentTime = 0;
+    }
+});
 
 const fartSounds = [new Audio('assets/fart.mp3'), new Audio('assets/fart.mp3'), new Audio('assets/fart.mp3')];
 let fartIndex = 0;
@@ -18,7 +23,7 @@ const giggleSound = new Audio('assets/giggle.mp3');
 const oddFartSound = new Audio('assets/oddfart.mp3');
 
 const backgroundVideo = document.createElement('video');
-backgroundVideo.src = 'assets/dj-bg.mp4';
+backgroundVideo.src = 'assets/dj-bg.mp4'; // Fixed!
 backgroundVideo.loop = true;
 backgroundVideo.muted = true;
 backgroundVideo.play().catch(err => console.error('Video blocked:', err));
@@ -133,6 +138,7 @@ function drawBackground() {
             ctx.drawImage(backgroundVideo, 0, 0, canvas.width, canvas.height);
             backgroundVideo.width = canvas.width;
             backgroundVideo.height = canvas.height;
+            console.log('Canvas:', canvas.width, canvas.height);
         } catch (e) {
             console.error('Video draw fail:', e.message, backgroundVideo.readyState);
             ctx.fillStyle = isDarkMode ? skyColorDark : skyColorLight;
@@ -211,14 +217,14 @@ function generateDust() {
             width: 40,
             height: 40,
             visible: true,
-            timeLeft: 5,
+            timeLeft: 5, // Shorter life
             growth: 10,
             maxGrowth: Math.random() * 40 + 30,
             value: Math.random() < 0.5 ? 3 : Math.random() < 0.75 ? 5 : 7,
-            x: player.x + player.width / 2 + (Math.random() - 0.5) * 150,
-            y: player.y + player.height / 2 + (Math.random() - 0.5) * 150,
+            x: player.x + player.width / 2 + (Math.random() - 0.5) * 200, // Wider spawn
+            y: player.y + player.height / 2 + (Math.random() - 0.5) * 100,
             tentacle: 0,
-            driftX: 0, // Reset for sway
+            driftX: 0,
             driftY: 0
         };
         dustParticles.push(dust);
@@ -231,12 +237,12 @@ function generateDust() {
 function drawDust() {
     dustParticles.forEach((dust, index) => {
         if (dust.visible) {
-            dust.tentacle += 0.05;
-            dust.driftX = Math.sin(dust.tentacle) * 0.5;
-            dust.driftY -= 0.1;
+            dust.tentacle += 0.03;
+            dust.driftX = Math.sin(dust.tentacle) * 1.5;
+            dust.driftY = (dust.y < player.y + 50 ? 0.1 : -0.1) + Math.cos(dust.tentacle) * 0.2;
             dust.x += dust.driftX;
             dust.y += dust.driftY;
-            dust.growth += 0.3;
+            dust.growth += 0.2;
             dust.timeLeft -= 1 / 60;
 
             let color;
@@ -248,7 +254,7 @@ function drawDust() {
             ctx.fillStyle = color;
             ctx.save();
             ctx.translate(dust.x, dust.y);
-            ctx.scale(1 + Math.sin(dust.tentacle) * 0.5, 1 + Math.cos(dust.tentacle) * 0.5);
+            ctx.scale(1 + Math.sin(dust.tentacle) * 0.6, 1 + Math.cos(dust.tentacle) * 0.6);
             ctx.beginPath();
             const baseRadius = dust.width * (dust.growth / dust.maxGrowth);
             ctx.arc(0, 0, baseRadius, 0, Math.PI * 2);
