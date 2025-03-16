@@ -1,4 +1,5 @@
-﻿const canvas = document.getElementById('gameCanvas');
+﻿// Sticky_UFD Game - Part 1: First Half
+const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const soundEffects = document.getElementById('soundEffects');
 
@@ -72,7 +73,6 @@ const skyColorLight = '#4682B4';
 const skyColorDark = '#1a1a2e';
 const cloudColorLight = '#FFFFFF';
 const cloudColorDark = '#4A4A4A';
-let cloudSwirl = 0;
 
 const soundEffectsMap = {
     'pop': 0,
@@ -145,12 +145,8 @@ function drawBackground() {
         if (isDarkMode) drawStars();
         ctx.fillStyle = isDarkMode ? cloudColorDark : cloudColorLight;
 
-        cloudSwirl += 0.02;
-        if (Math.random() < 0.01) cloudSwirl += 1;
-
         ctx.save();
         ctx.translate(120, 110);
-        ctx.rotate(cloudSwirl);
         ctx.beginPath();
         ctx.arc(-20, -10, 40, 0, Math.PI * 2);
         ctx.arc(20, 0, 30, 0, Math.PI * 2);
@@ -160,7 +156,6 @@ function drawBackground() {
 
         ctx.save();
         ctx.translate(360, 160);
-        ctx.rotate(-cloudSwirl);
         ctx.beginPath();
         ctx.arc(-10, -10, 40, 0, Math.PI * 2);
         ctx.arc(30, 0, 35, 0, Math.PI * 2);
@@ -223,8 +218,8 @@ function generateDust() {
             x: player.x + player.width / 2 + (Math.random() - 0.5) * 150,
             y: player.y + player.height / 2 + (Math.random() - 0.5) * 150,
             tentacle: 0,
-            driftX: -(Math.random() * 2 + 1),
-            driftY: -(Math.random() * 0.5 + 0.3)
+            driftX: 0, // Reset for sway
+            driftY: 0
         };
         dustParticles.push(dust);
     }
@@ -237,11 +232,11 @@ function drawDust() {
     dustParticles.forEach((dust, index) => {
         if (dust.visible) {
             dust.tentacle += 0.05;
-            dust.driftX -= Math.sin(dust.tentacle) * 0.2;
-            dust.driftY -= Math.cos(dust.tentacle) * 0.2 + 0.1;
-            dust.x += dust.driftX + Math.random() * 1 - 0.5;
+            dust.driftX = Math.sin(dust.tentacle) * 0.5;
+            dust.driftY -= 0.1;
+            dust.x += dust.driftX;
             dust.y += dust.driftY;
-            dust.growth += 0.5;
+            dust.growth += 0.3;
             dust.timeLeft -= 1 / 60;
 
             let color;
@@ -253,11 +248,10 @@ function drawDust() {
             ctx.fillStyle = color;
             ctx.save();
             ctx.translate(dust.x, dust.y);
-            ctx.scale(1 + Math.sin(dust.tentacle) * 0.3, 1 + Math.cos(dust.tentacle) * 0.4);
+            ctx.scale(1 + Math.sin(dust.tentacle) * 0.5, 1 + Math.cos(dust.tentacle) * 0.5);
             ctx.beginPath();
             const baseRadius = dust.width * (dust.growth / dust.maxGrowth);
-            const pulse = Math.sin(dust.tentacle) * 5;
-            ctx.arc(0, 0, baseRadius + pulse, 0, Math.PI * 2);
+            ctx.arc(0, 0, baseRadius, 0, Math.PI * 2);
             ctx.fill();
             ctx.restore();
 
@@ -470,6 +464,7 @@ canvas.addEventListener('click', function (event) {
     let rect = canvas.getBoundingClientRect();
     let x = event.clientX - rect.left;
     let y = event.clientY - rect.top;
+    console.log('Click at:', x, y);
 
     if (x >= canvas.width - 150 && x <= canvas.width - 10 && y >= canvas.height - 30 && y <= canvas.height - 10) {
         isMuted = !isMuted;
@@ -546,7 +541,7 @@ canvas.addEventListener('click', function (event) {
 
     for (let i = dustParticles.length - 1; i >= 0; i--) {
         const dust = dustParticles[i];
-        const pulseRadius = dust.width * (dust.growth / dust.maxGrowth) + Math.sin(dust.tentacle) * 5;
+        const pulseRadius = dust.width * (dust.growth / dust.maxGrowth);
         if (dust.visible && x >= dust.x - pulseRadius && x <= dust.x + pulseRadius && y >= dust.y - pulseRadius && y <= dust.y + pulseRadius) {
             dustCount += dust.value;
             explodeDust(dust.x, dust.y, dust.value);
