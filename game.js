@@ -1,4 +1,4 @@
-﻿// Sticky_UFD Game - Part 1: Setup & Assets (March 22, 2025)
+﻿// Sticky_UFD Game - Part 1: Setup & Assets (March 23, 2025)
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const soundEffects = document.getElementById('soundEffects');
@@ -34,13 +34,14 @@ const uhOhSound = new Audio('assets/uh_oh.mp3');
 
 const backgroundVideo = document.createElement('video');
 let scenes = [
-    { type: 'static', name: 'Day', color: '#4682B4' },
-    { type: 'static', name: 'Night', color: '#1a1a2e' },
-    { type: 'video', name: 'Fartscape 1', src: 'assets/dj-bg.mp4' },
-    { type: 'video', name: 'Fartscape 2', src: 'assets/scene1.mp4' },
-    { type: 'video', name: 'Fartscape 3', src: 'assets/scene2.mp4' }
+    { type: 'static', name: 'Day', color: '#4682B4' }, // Chill Mode only
+    { type: 'static', name: 'Night', color: '#1a1a2e' }, // Chill Mode only
+    { type: 'video', name: 'Fartscape 1', src: 'assets/dj-bg.mp4' }, // Level 3
+    { type: 'video', name: 'Fartscape 2', src: 'assets/fartscape-4.mp4' }, // Level 4 (placeholder)
+    { type: 'video', name: 'Fartscape 3', src: 'assets/fartscape-5.mp4' } // Level 5 (placeholder)
 ];
-let currentScene = 0;
+let chillMode = true;
+let currentScene = chillMode ? 1 : 2; // Chill starts Night, Game starts Fartscape 1 (Level 3)
 backgroundVideo.src = scenes[currentScene].src || '';
 backgroundVideo.loop = true;
 backgroundVideo.muted = true;
@@ -51,7 +52,7 @@ backgroundVideo.addEventListener('canplaythrough', () => { videoReady = true; })
 const unicornImg = new Image(); unicornImg.src = 'assets/unicorn.png';
 const dustImg = new Image(); dustImg.src = 'assets/dust.png';
 const wordsImg = new Image(); wordsImg.src = 'assets/words.png';
-const unicornWizardImg = new Image(); unicornWizardImg.src = 'assets/unicorn_wizard.png';
+const rontoshiSilvermotoImg = new Image(); rontoshiSilvermotoImg.src = 'assets/unicorn_wizard.png';
 
 const player = {
     x: 0, y: 0, width: 200, height: 200, angle: 0, farting: false, direction: 'right',
@@ -65,11 +66,11 @@ let chillDust = 0;
 let gameDust = 0;
 let power = 0;
 let powerChargeTime = 10;
-let isDarkMode = false;
+let isDarkMode = scenes[currentScene].name === 'Night';
 let showLeaderboard = false;
 let isLocked = true;
-let showUnicornWizard = false;
-let unicornWizardStep = 0;
+let showRontoshiSilvermoto = false;
+let rontoshiSilvermotoStep = 0;
 let bearomeThreshold = Math.floor(Math.random() * 251) + 500;
 let bearomeActive = false;
 let bearomeTimer = 0;
@@ -77,6 +78,7 @@ let bearomeWarnings = 0;
 let shrinkActive = false;
 let shrinkDuration = 0;
 let isMuted = false;
+let isAllMuted = false;
 let isMusicOn = true;
 let lastClickTime = Date.now();
 const idleTimeout = 3000;
@@ -100,8 +102,7 @@ let envMaxDelay = 15;
 let thunderWarning = 0;
 let thunderActive = false;
 let ufdPrice = 'Loading...';
-let currentLevel = 1;
-let chillMode = true;
+let currentLevel = chillMode ? 1 : 3; // Game starts at Level 3
 
 const skyColorLight = '#4682B4';
 const skyColorDark = '#1a1a2e';
@@ -149,6 +150,19 @@ function resizeCanvas() {
         star.x = Math.random() * canvas.width;
         star.y = Math.random() * canvas.height;
     });
+    if (chillMode && currentScene !== 1) {
+        currentScene = 1;
+        backgroundVideo.pause();
+        backgroundVideo.src = '';
+        isDarkMode = true;
+        document.body.classList.add('dark-mode');
+    } else if (!chillMode && currentLevel === 3 && currentScene !== 2) {
+        currentScene = 2;
+        backgroundVideo.src = scenes[currentScene].src;
+        backgroundVideo.play();
+        isDarkMode = false;
+        document.body.classList.remove('dark-mode');
+    }
 }
 window.addEventListener('resize', resizeCanvas);
 window.addEventListener('load', () => {
@@ -349,7 +363,6 @@ function drawLeaderboard() {
         ctx.textAlign = 'center';
         ctx.fillText(chillMode ? 'Chill Leaderboard' : 'Game Leaderboard', canvas.width / 2, canvas.height / 4 + 30);
         if (leaderboardData.length === 0) {
-            console.log('Leaderboard empty or not fetched');
             ctx.fillText('Loading...', canvas.width / 2, canvas.height / 4 + 60);
             fetchLeaderboard();
         } else {
@@ -362,13 +375,11 @@ function drawLeaderboard() {
 }
 
 function fetchLeaderboard() {
-    console.log('Fetching leaderboard...');
     db.collection('leaderboard')
         .orderBy('score', 'desc')
         .limit(10)
         .get()
         .then((querySnapshot) => {
-            console.log('Fetched docs:', querySnapshot.size);
             leaderboardData = [];
             if (querySnapshot.empty) {
                 leaderboardData.push({ name: 'No scores yet!', score: '' });
@@ -386,9 +397,7 @@ function fetchLeaderboard() {
 }
 
 function updateLeaderboard(newScore) {
-    console.log('updateLeaderboard called with:', newScore);
     if (newScore > 0 && newScore < 10000) {
-        console.log('Sending:', playerName, newScore);
         db.collection('leaderboard').doc(playerName + (chillMode ? '_chill' : '_game')).set({
             name: `${playerName} (${chillMode ? 'Chill' : 'L' + currentLevel})`,
             score: newScore,
@@ -400,14 +409,14 @@ function updateLeaderboard(newScore) {
 }
 
 function playSoundEffect(effectName) {
-    if (!isMuted && soundEffectsMap[effectName] !== undefined) {
+    if (!isMuted && !isAllMuted && soundEffectsMap[effectName] !== undefined) {
         soundEffects.currentTime = soundEffectsMap[effectName];
         soundEffects.play().catch(() => console.log('Sound blocked'));
     }
 }
 
 function toggleMusic() {
-    if (isMusicOn && !isMuted) {
+    if (isMusicOn && !isAllMuted) {
         if (!musicStarted) {
             backgroundMusic.play().catch(err => console.error('Music blocked:', err));
             musicStarted = true;
@@ -420,7 +429,7 @@ function toggleMusic() {
 }
 
 function playRandomGiggleFart() {
-    if (!isMuted) {
+    if (!isMuted && !isAllMuted) {
         giggleSound.play().catch(() => console.log('Giggle blocked'));
         setTimeout(() => oddFartSound.play().catch(() => console.log('Odd fart blocked')), 500);
     }
@@ -455,6 +464,17 @@ function triggerThunder() {
                 player.health -= 20;
                 ctx.fillText('Thunder hits!', canvas.width / 2, 50);
             }
+        } else {
+            if (shieldActive) {
+                dusterStrength = dustCollected > 0 ? Math.min(dustCollected, 3) : 0;
+                shieldCharged = dusterStrength > 0;
+                shieldActive = false;
+                shieldTimer = 0;
+                if (dusterStrength === 3) hornsUpTimer = 2;
+                ctx.fillText(shieldCharged ? `Shield charged (S${dusterStrength})!` : 'Shield practice!', canvas.width / 2, 50);
+            } else {
+                ctx.fillText('Thunder strikes—no harm in Chill!', canvas.width / 2, 50);
+            }
         }
         dustCollected = 0;
         setTimeout(() => { thunderActive = false; }, 1200);
@@ -480,7 +500,7 @@ function drawSettings() {
         ctx.font = '20px Arial';
         ctx.textAlign = 'left';
         ctx.fillText('Settings', canvas.width - 190, 40);
-        ctx.fillText(isMuted ? 'Unmute (M)' : 'Mute (M)', canvas.width - 190, 70);
+        ctx.fillText(isMuted ? 'Unmute Farts (M)' : 'Mute Farts (M)', canvas.width - 190, 70);
         ctx.fillText(isMusicOn ? 'Music Off (N)' : 'Music On (N)', canvas.width - 190, 100);
         ctx.fillText(`Scene: ${scenes[currentScene].name} (B)`, canvas.width - 190, 130);
         ctx.fillText('Leaderboard (L)', canvas.width - 190, 160);
@@ -494,6 +514,38 @@ function drawSettings() {
         ctx.textAlign = 'center';
         ctx.fillText('X', canvas.width - 20, 35);
     }
+}
+
+function drawMuteAllButton() {
+    ctx.save();
+    const yPos = chillMode ? 110 : 160;
+    ctx.translate(105, yPos);
+    ctx.fillStyle = isAllMuted ? 'rgba(255, 0, 0, 0.7)' : 'rgba(255, 255, 255, 0.7)';
+    ctx.beginPath();
+    ctx.arc(0, 0, 15, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#FF69B4';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = '#000000';
+    ctx.beginPath();
+    ctx.moveTo(-5, -5);
+    ctx.lineTo(5, -3);
+    ctx.lineTo(3, 3);
+    ctx.lineTo(-5, 5);
+    ctx.closePath();
+    ctx.fill();
+    if (isAllMuted) {
+        ctx.beginPath();
+        ctx.moveTo(-5, -5);
+        ctx.lineTo(5, 5);
+        ctx.moveTo(5, -5);
+        ctx.lineTo(-5, 5);
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+    }
+    ctx.restore();
 }
 
 function gameLoop() {
@@ -524,13 +576,13 @@ function gameLoop() {
     } else {
         drawBackground();
         drawUnicorn();
-        if (!chillMode && thunderWarning === 1) {
+        if (thunderWarning === 1) {
             ctx.fillStyle = 'rgba(255, 255, 0, 0.7)';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             ctx.fillStyle = '#FFFFFF';
             ctx.fillText('Thunder incoming!', canvas.width / 2, 50);
         }
-        if (!chillMode && thunderActive) {
+        if (thunderActive) {
             ctx.strokeStyle = 'rgba(255, 255, 0, 0.8)';
             ctx.lineWidth = 5;
             ctx.beginPath();
@@ -554,12 +606,12 @@ function gameLoop() {
             if (power > 1) power = 1;
         }
 
+        envTimer += 1 / 60;
+        if (envTimer >= envMaxDelay) {
+            envTimer = Math.random() * envMaxDelay;
+            triggerThunder();
+        }
         if (!chillMode) {
-            envTimer += 1 / 60;
-            if (envTimer >= envMaxDelay) {
-                envTimer = Math.random() * envMaxDelay;
-                triggerThunder();
-            }
             if (gameDust >= 2000 && currentLevel < 5) {
                 currentLevel = 5; envMaxDelay = 3;
                 currentScene = 4;
@@ -568,25 +620,36 @@ function gameLoop() {
                 currentLevel = 4; envMaxDelay = 6;
                 currentScene = 3;
                 backgroundVideo.src = scenes[currentScene].src; backgroundVideo.play();
-            } else if (gameDust >= 500 && currentLevel < 3) {
+            } else if (gameDust >= 100 && currentLevel < 3) {
                 currentLevel = 3; envMaxDelay = 9;
                 currentScene = 2;
                 backgroundVideo.src = scenes[currentScene].src; backgroundVideo.play();
-            } else if (gameDust >= 200 && currentLevel < 2) {
-                currentLevel = 2; envMaxDelay = 12;
-                currentScene = 1;
-                backgroundVideo.pause(); backgroundVideo.src = '';
             }
         }
 
         if (hornsUpTimer > 0) {
             hornsUpTimer -= 1 / 60;
-            ctx.fillText('Horns Up!', canvas.width / 2, 70);
+            ctx.fillStyle = '#FFFF00';
+            ctx.font = '30px Arial';
+            ctx.fillText('Horns Up—Double Dust Radius!', canvas.width / 2, 70);
             if (hornsUpTimer <= 0) dusterStrength = 0;
         }
         if (shieldActive) {
+            shieldTimer += 1 / 60;
+            if (shieldTimer >= 5) {
+                shieldActive = false;
+                shieldTimer = 0;
+                ctx.fillText('Shield dropped!', canvas.width / 2, 50);
+            }
             ctx.fillText('Shield up—collect dust!', canvas.width / 2, 50);
         } else if (shieldCharged) {
+            shieldTimer += 1 / 60;
+            if (shieldTimer >= 10) {
+                shieldCharged = false;
+                shieldTimer = 0;
+                dusterStrength = 0;
+                ctx.fillText('Shield charge lost!', canvas.width / 2, 50);
+            }
             ctx.fillText(`Shield charged (S${dusterStrength})—tap X to strike!`, canvas.width / 2, 50);
         }
 
@@ -601,15 +664,15 @@ function gameLoop() {
                 switch (bearomeWarnings) {
                     case 1:
                         ctx.fillText('Bearome Scowel: Horns tingling yet?', canvas.width / 2, 30);
-                        if (!isMuted) hornTingleSound.play().catch(() => console.log('Tingle blocked'));
+                        if (!isMuted && !isAllMuted) hornTingleSound.play().catch(() => console.log('Tingle blocked'));
                         break;
                     case 2:
                         ctx.fillText('Bearome Scowel: Feel my wrath brewing!', canvas.width / 2, 30);
-                        if (!isMuted) feelSomethingSound.play().catch(() => console.log('Feel blocked'));
+                        if (!isMuted && !isAllMuted) feelSomethingSound.play().catch(() => console.log('Feel blocked'));
                         break;
                     case 3:
                         ctx.fillText('Bearome Scowel: Glitter storm incoming!', canvas.width / 2, 30);
-                        if (!isMuted) uhOhSound.play().catch(() => console.log('Uh oh blocked'));
+                        if (!isMuted && !isAllMuted) uhOhSound.play().catch(() => console.log('Uh oh blocked'));
                         bearomeActive = true;
                         setTimeout(() => {
                             if (!shieldActive && !shieldCharged) {
@@ -641,24 +704,24 @@ function gameLoop() {
             ctx.fillText('Glitter Bomb—dust shrunk!', canvas.width / 2, 90);
         }
 
-        if (showUnicornWizard && unicornWizardImg.complete) {
-            ctx.drawImage(unicornWizardImg, canvas.width - 300, canvas.height / 2 - 100, 200, 200);
+        if (showRontoshiSilvermoto && rontoshiSilvermotoImg.complete) {
+            ctx.drawImage(rontoshiSilvermotoImg, canvas.width - 300, canvas.height / 2 - 100, 200, 200);
             ctx.fillStyle = '#FFFFFF';
             ctx.font = '20px Arial';
             ctx.textAlign = 'center';
-            if (unicornWizardStep === 0) {
-                ctx.fillText('Unicorn Wizard: Welcome Dust Collectors!', canvas.width - 150, canvas.height / 2 + 120);
-            } else if (unicornWizardStep === 1) {
-                ctx.fillText('Unicorn Wizard: Tap to gather fart dust!', canvas.width - 150, canvas.height / 2 + 120);
-            } else if (unicornWizardStep === 2) {
-                ctx.fillText('Unicorn Wizard: Shield from Bearome’s thunder!', canvas.width - 150, canvas.height / 2 + 120);
-                setTimeout(() => { showUnicornWizard = false; unicornWizardStep = 3; }, 4000);
-            } else if (unicornWizardStep === 3) {
-                ctx.fillText('Unicorn Wizard: Dust Master!', canvas.width - 150, canvas.height / 2 + 120);
-                setTimeout(() => { showUnicornWizard = false; }, 4000);
-            } else if (unicornWizardStep === 4) {
-                ctx.fillText('Unicorn Wizard: Glitter Hoof Legend!', canvas.width - 150, canvas.height / 2 + 120);
-                setTimeout(() => { showUnicornWizard = false; }, 4000);
+            if (rontoshiSilvermotoStep === 0) {
+                ctx.fillText('Rontoshi Silvermoto: Welcome Dust Collectors!', canvas.width - 150, canvas.height / 2 + 120);
+            } else if (rontoshiSilvermotoStep === 1) {
+                ctx.fillText('Rontoshi Silvermoto: Tap to gather fart dust!', canvas.width - 150, canvas.height / 2 + 120);
+            } else if (rontoshiSilvermotoStep === 2) {
+                ctx.fillText('Rontoshi Silvermoto: Shield from Bearome’s thunder!', canvas.width - 150, canvas.height / 2 + 120);
+                setTimeout(() => { showRontoshiSilvermoto = false; rontoshiSilvermotoStep = 3; }, 4000);
+            } else if (rontoshiSilvermotoStep === 3) {
+                ctx.fillText('Rontoshi Silvermoto: Dust Master!', canvas.width - 150, canvas.height / 2 + 120);
+                setTimeout(() => { showRontoshiSilvermoto = false; }, 4000);
+            } else if (rontoshiSilvermotoStep === 4) {
+                ctx.fillText('Rontoshi Silvermoto: Glitter Hoof Legend!', canvas.width - 150, canvas.height / 2 + 120);
+                setTimeout(() => { showRontoshiSilvermoto = false; }, 4000);
             }
         }
 
@@ -683,13 +746,13 @@ function gameLoop() {
             ctx.strokeStyle = '#FF69B4';
             ctx.strokeRect(10, 100, 200, 20);
         }
-
         ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
         ctx.fillRect(10, chillMode ? 80 : 130, 200, 20);
         ctx.fillStyle = '#FFFF00';
         ctx.fillRect(10, chillMode ? 80 : 130, 200 * power, 20);
         ctx.strokeStyle = '#FF69B4';
         ctx.strokeRect(10, chillMode ? 80 : 130, 200, 20);
+        drawMuteAllButton();
 
         ctx.fillStyle = power >= 1 && !shieldActive && !shieldCharged ? '#FFFF00' : 'rgba(255, 255, 255, 0.5)';
         ctx.beginPath();
@@ -754,9 +817,9 @@ canvas.addEventListener('click', function (event) {
         if (x >= canvas.width / 2 - 100 && x <= canvas.width / 2 + 100 &&
             y >= canvas.height / 2 - 50 && y <= canvas.height / 2 + 50) {
             isLocked = false;
-            showUnicornWizard = true;
-            unicornWizardStep = 0;
-            if (!isMuted) buttercupSound.play().catch(() => console.log('Buttercup blocked'));
+            showRontoshiSilvermoto = true;
+            rontoshiSilvermotoStep = 0;
+            if (!isMuted && !isAllMuted) buttercupSound.play().catch(() => console.log('Buttercup blocked'));
         }
         return;
     }
@@ -766,12 +829,33 @@ canvas.addEventListener('click', function (event) {
             y >= canvas.height / 2 + 20 && y <= canvas.height / 2 + 60) {
             player.health = 100;
             gameDust = 0;
-            currentLevel = 1;
-            envMaxDelay = 15;
+            currentLevel = 3;
+            envMaxDelay = 9;
             dustParticles.length = 0;
             power = 0;
-            currentScene = 0;
-            backgroundVideo.pause(); backgroundVideo.src = '';
+            currentScene = 2;
+            backgroundVideo.src = scenes[currentScene].src;
+            backgroundVideo.play();
+            isDarkMode = false;
+            document.body.classList.remove('dark-mode');
+        }
+        return;
+    }
+
+    const muteY = chillMode ? 110 : 160;
+    if (!isLocked && Math.sqrt((x - 105) ** 2 + (y - muteY) ** 2) <= 15) {
+        isAllMuted = !isAllMuted;
+        if (isAllMuted) {
+            soundEffects.pause();
+            fartSounds.forEach(f => { f.pause(); f.currentTime = 0; });
+            backgroundMusic.pause();
+            musicStarted = false;
+        } else {
+            if (!isMuted) { }
+            if (isMusicOn) {
+                backgroundMusic.play().catch(err => console.error('Music blocked:', err));
+                musicStarted = true;
+            }
         }
         return;
     }
@@ -785,11 +869,8 @@ canvas.addEventListener('click', function (event) {
             if (y >= 50 && y <= 80) {
                 isMuted = !isMuted;
                 if (isMuted) {
+                    fartSounds.forEach(f => { f.pause(); f.currentTime = 0; });
                     soundEffects.pause();
-                    backgroundMusic.pause();
-                    fartSounds.forEach(f => f.pause());
-                } else {
-                    toggleMusic();
                 }
             } else if (y >= 80 && y <= 110) {
                 isMusicOn = !isMusicOn;
@@ -806,7 +887,6 @@ canvas.addEventListener('click', function (event) {
                 isDarkMode = scenes[currentScene].name === 'Night';
                 document.body.classList.toggle('dark-mode', isDarkMode);
             } else if (y >= 140 && y <= 170) {
-                console.log('Leaderboard clicked!');
                 showLeaderboard = true;
                 fetchLeaderboard();
                 showSettings = false;
@@ -816,8 +896,20 @@ canvas.addEventListener('click', function (event) {
                     player.health = 100;
                     currentLevel = 1;
                     envMaxDelay = 15;
-                    currentScene = 0;
-                    backgroundVideo.pause(); backgroundVideo.src = '';
+                    currentScene = 1;
+                    backgroundVideo.pause();
+                    backgroundVideo.src = '';
+                    isDarkMode = true;
+                    document.body.classList.add('dark-mode');
+                } else {
+                    player.health = 100;
+                    currentLevel = 3;
+                    envMaxDelay = 9;
+                    currentScene = 2;
+                    backgroundVideo.src = scenes[currentScene].src;
+                    backgroundVideo.play();
+                    isDarkMode = false;
+                    document.body.classList.remove('dark-mode');
                 }
             }
             return;
@@ -839,19 +931,24 @@ canvas.addEventListener('click', function (event) {
         return;
     }
 
-    if (showUnicornWizard && unicornWizardStep < 3) {
-        unicornWizardStep++;
+    if (showRontoshiSilvermoto && rontoshiSilvermotoStep < 3) {
+        rontoshiSilvermotoStep++;
         return;
     }
 
     if (chillMode && Math.sqrt((x - (canvas.width / 2 + 50)) ** 2 + (y - 20) ** 2) <= 20 && power >= 1) {
         chillMode = false;
         gameDust = 0;
-        currentLevel = 1;
-        envMaxDelay = 15;
+        currentLevel = 3;
+        envMaxDelay = 9;
         envTimer = 0;
         player.health = 100;
         dustParticles.length = 0;
+        currentScene = 2;
+        backgroundVideo.src = scenes[currentScene].src;
+        backgroundVideo.play();
+        isDarkMode = false;
+        document.body.classList.remove('dark-mode');
         return;
     }
 
@@ -863,12 +960,14 @@ canvas.addEventListener('click', function (event) {
             ctx.fillText('Shield up!', canvas.width / 2, 50);
         } else if (shieldCharged) {
             shieldCharged = false;
+            shieldTimer = 0;
             let collected = 0;
+            let strikeRadius = hornsUpTimer > 0 ? 200 : 100;
             for (let j = dustParticles.length - 1; j >= 0; j--) {
                 const dust = dustParticles[j];
                 const dx = dust.x - x;
                 const dy = dust.y - y;
-                if (dust.visible && (hornsUpTimer > 0 ? Math.sqrt(dx * dx + dy * dy) <= 100 : true)) {
+                if (dust.visible && Math.sqrt(dx * dx + dy * dy) <= strikeRadius) {
                     collected += dust.value * (1 + dusterStrength * 0.3);
                     explodeDust(dust.x, dust.y, dust.value);
                     dustParticles.splice(j, 1);
@@ -904,15 +1003,15 @@ canvas.addEventListener('click', function (event) {
 
     player.farting = true;
     generateDust();
-    if (!isMuted && isMusicOn) {
+    if (!isMuted && !isAllMuted) {
         fartSounds[fartIndex].pause();
         fartSounds[fartIndex].currentTime = 0;
         fartSounds[fartIndex].play().catch(() => console.log('Fart blocked'));
         fartIndex = (fartIndex + 1) % 3;
-        if (!musicStarted) {
-            backgroundMusic.play().catch(err => console.error('Music blocked:', err));
-            musicStarted = true;
-        }
+    }
+    if (!isAllMuted && isMusicOn && !musicStarted) {
+        backgroundMusic.play().catch(err => console.error('Music blocked:', err));
+        musicStarted = true;
     }
     player.shiftX = Math.random() * 10 - 5;
     player.shiftY = -10;
@@ -921,7 +1020,7 @@ canvas.addEventListener('click', function (event) {
     clickState = 1;
     setTimeout(() => { clickState = 2; }, 150);
     setTimeout(() => { clickState = 0; player.farting = false; }, 300);
-    if (!isMuted) setTimeout(() => playSoundEffect('pop'), 200);
+    if (!isMuted && !isAllMuted) setTimeout(() => playSoundEffect('pop'), 200);
 
     for (let i = dustParticles.length - 1; i >= 0; i--) {
         const dust = dustParticles[i];
@@ -930,6 +1029,11 @@ canvas.addEventListener('click', function (event) {
             dust.health--;
             if (dust.health <= 0) {
                 if (chillMode) chillDust += dust.value; else gameDust += dust.value;
+                if (dust.value === 3 && shieldCharged) {
+                    shieldTimer = Math.max(0, shieldTimer - 0.7);
+                    ctx.fillStyle = '#FFFF00';
+                    ctx.fillText('+0.7s Shield', dust.x, dust.y - 60);
+                }
                 if (dust.value === 3 && player.health < 100 && !chillMode) {
                     player.health = Math.min(100, player.health + 5);
                     ctx.fillStyle = '#00FF00';
@@ -949,17 +1053,17 @@ canvas.addEventListener('click', function (event) {
                 if (shieldActive && thunderWarning) {
                     window.collectDustDuringStorm();
                 }
-                if ((chillMode ? chillDust : gameDust) >= 125 && (chillMode ? chillDust : gameDust) - dust.value < 125 && !isMuted) {
+                if ((chillMode ? chillDust : gameDust) >= 100 && (chillMode ? chillDust : gameDust) - dust.value < 100 && !isMuted && !isAllMuted) {
                     fanfareSound.play().catch(() => console.log('Fanfare blocked'));
                     setTimeout(() => {
-                        showUnicornWizard = true;
-                        unicornWizardStep = 3;
+                        showRontoshiSilvermoto = true;
+                        rontoshiSilvermotoStep = 3;
                         dusterSound.play().catch(() => console.log('Duster blocked'));
                     }, 1000);
                 }
-                if ((chillMode ? chillDust : gameDust) >= 1000 && (chillMode ? chillDust : gameDust) - dust.value < 1000 && !isMuted) {
-                    showUnicornWizard = true;
-                    unicornWizardStep = 4;
+                if ((chillMode ? chillDust : gameDust) >= 1000 && (chillMode ? chillDust : gameDust) - dust.value < 1000 && !isMuted && !isAllMuted) {
+                    showRontoshiSilvermoto = true;
+                    rontoshiSilvermotoStep = 4;
                     diamondHoofSound.play().catch(() => console.log('Diamond blocked'));
                 }
                 updateLeaderboard(chillMode ? chillDust : gameDust);
@@ -976,13 +1080,11 @@ canvas.addEventListener('click', function (event) {
 document.addEventListener('keydown', (event) => {
     const key = event.key.toLowerCase();
     if (key === 'm') {
+        if (isAllMuted) return;
         isMuted = !isMuted;
         if (isMuted) {
+            fartSounds.forEach(f => { f.pause(); f.currentTime = 0; });
             soundEffects.pause();
-            backgroundMusic.pause();
-            fartSounds.forEach(f => f.pause());
-        } else {
-            toggleMusic();
         }
     }
     if (key === 'n') {
@@ -1002,7 +1104,6 @@ document.addEventListener('keydown', (event) => {
         document.body.classList.toggle('dark-mode', isDarkMode);
     }
     if (key === 'l') {
-        console.log('Leaderboard toggled!');
         showLeaderboard = !showLeaderboard;
         if (showLeaderboard) fetchLeaderboard();
         showSettings = false;
@@ -1015,12 +1116,14 @@ document.addEventListener('keydown', (event) => {
     }
     if (key === 'x' && shieldCharged) {
         shieldCharged = false;
+        shieldTimer = 0;
         let collected = 0;
+        let strikeRadius = hornsUpTimer > 0 ? 200 : 100;
         for (let j = dustParticles.length - 1; j >= 0; j--) {
             const dust = dustParticles[j];
-            const dx = dust.x - (canvas.width / 2); // Center-ish for key press
+            const dx = dust.x - (canvas.width / 2);
             const dy = dust.y - (canvas.height / 2);
-            if (dust.visible && (hornsUpTimer > 0 ? Math.sqrt(dx * dx + dy * dy) <= 100 : true)) {
+            if (dust.visible && Math.sqrt(dx * dx + dy * dy) <= strikeRadius) {
                 collected += dust.value * (1 + dusterStrength * 0.3);
                 explodeDust(dust.x, dust.y, dust.value);
                 dustParticles.splice(j, 1);
@@ -1062,18 +1165,35 @@ document.addEventListener('keydown', (event) => {
             player.health = 100;
             currentLevel = 1;
             envMaxDelay = 15;
-            currentScene = 0;
-            backgroundVideo.pause(); backgroundVideo.src = '';
+            currentScene = 1;
+            backgroundVideo.pause();
+            backgroundVideo.src = '';
+            isDarkMode = true;
+            document.body.classList.add('dark-mode');
+        } else {
+            player.health = 100;
+            currentLevel = 3;
+            envMaxDelay = 9;
+            currentScene = 2;
+            backgroundVideo.src = scenes[currentScene].src;
+            backgroundVideo.play();
+            isDarkMode = false;
+            document.body.classList.remove('dark-mode');
         }
     }
     if (key === 'g' && chillMode && power >= 1) {
         chillMode = false;
         gameDust = 0;
-        currentLevel = 1;
-        envMaxDelay = 15;
+        currentLevel = 3;
+        envMaxDelay = 9;
         envTimer = 0;
         player.health = 100;
         dustParticles.length = 0;
+        currentScene = 2;
+        backgroundVideo.src = scenes[currentScene].src;
+        backgroundVideo.play();
+        isDarkMode = false;
+        document.body.classList.remove('dark-mode');
     }
     lastClickTime = Date.now();
 });
