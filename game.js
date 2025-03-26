@@ -1,7 +1,6 @@
-﻿// Sticky_UFD Game - Part 1: Setup & Assets (March 23, 2025)
+﻿// Sticky_UFD Game - Part 1: Setup & Assets (March 25, 2025)
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
-const soundEffects = document.getElementById('soundEffects');
 
 const firebaseConfig = {
     apiKey: "AIzaSyAZ6YYV0zRQ74hrJ4HwsMUujk9rLRA8utg",
@@ -15,28 +14,37 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-const backgroundMusic = new Audio('assets/music2.mp3');
-backgroundMusic.loop = true;
-backgroundMusic.volume = 0.5;
+// Music tracks
+const musicTracks = [
+    new Audio('assets/music1.mp3'),
+    new Audio('assets/music2.mp3'),
+    new Audio('assets/music3.mp3')
+];
+let currentMusicIndex = 1;
+musicTracks.forEach(track => {
+    track.loop = true;
+    track.volume = 0.5;
+});
+let backgroundMusic = musicTracks[currentMusicIndex];
 let musicStarted = false;
 
 const fartSounds = [new Audio('assets/fart.mp3'), new Audio('assets/fart.mp3'), new Audio('assets/fart.mp3')];
-fartSounds.forEach(fart => fart.volume = 0.05); // Already added for farts
+fartSounds.forEach(fart => fart.volume = 0.10);
 let fartIndex = 0;
 const fanfareSound = new Audio('assets/fanfare.mp3');
 const giggleSound = new Audio('assets/giggle.mp3');
-giggleSound.volume = 0.05; // Add this for giggle
+giggleSound.volume = 0.10;
 const oddFartSound = new Audio('assets/oddfart.mp3');
-oddFartSound.volume = 0.05; // Add this for odd fart
+oddFartSound.volume = 0.10;
 const buttercupSound = new Audio('assets/buttercup.mp3');
 const dusterSound = new Audio('assets/duster.mp3');
 const diamondHoofSound = new Audio('assets/diamond_hoof.mp3');
 const hornTingleSound = new Audio('assets/horn_tingle.mp3');
 const feelSomethingSound = new Audio('assets/feel_something.mp3');
 const uhOhSound = new Audio('assets/uh_oh.mp3');
-const bearomeLaughSound = new Audio('assets/bearome_laugh.mp3'); // Placeholder
-const hoovesDownSound = new Audio('assets/hooves_down.mp3'); // Placeholder
-const closeCallSound = new Audio('assets/close_call.mp3'); // Placeholder
+const bearomeLaughSound = new Audio('assets/bearome_laugh.mp3');
+const hoovesDownSound = new Audio('assets/hooves_down.mp3');
+const closeCallSound = new Audio('assets/close_call.mp3');
 
 const backgroundVideo = document.createElement('video');
 let scenes = [
@@ -59,7 +67,8 @@ const unicornImg = new Image(); unicornImg.src = 'assets/unicorn.png';
 const dustImg = new Image(); dustImg.src = 'assets/dust.png';
 const wordsImg = new Image(); wordsImg.src = 'assets/words.png';
 const rontoshiSilvermotoImg = new Image(); rontoshiSilvermotoImg.src = 'assets/unicorn_wizard.png';
-const bearomeImg = new Image(); bearomeImg.src = 'assets/bearome.png'; // Add your Bearome image
+const bearomeImg = new Image(); bearomeImg.src = 'assets/bearome.png';
+const ledger = new Image(); ledger.src = 'assets/ledger.png';
 
 const player = {
     x: 0, y: 0, width: 200, height: 200, angle: 0, farting: false, direction: 'right',
@@ -92,7 +101,7 @@ let isAllMuted = false;
 let isMusicOn = true;
 let lastClickTime = Date.now();
 const idleTimeout = 3000;
-let clickState = 0;
+let fartAnimationTimer = 0; // Only timer for animation
 let showSettings = false;
 let playerName = localStorage.getItem('playerName') || null;
 if (!playerName) {
@@ -105,10 +114,11 @@ let shieldActive = false;
 let shieldTimer = 0;
 let shieldCharged = false;
 let dusterStrength = 0;
+let shieldHits = 0;
 let hornsUpTimer = 0;
 let collectAllReady = false;
 let envTimer = 0;
-let envMaxDelay = 15;
+let envMaxDelay = chillMode ? 15 : 15;
 let thunderWarning = 0;
 let thunderActive = false;
 let ufdPrice = 'Loading...';
@@ -118,8 +128,6 @@ const skyColorLight = '#4682B4';
 const skyColorDark = '#1a1a2e';
 const cloudColorLight = '#FFFFFF';
 const cloudColorDark = '#4A4A4A';
-
-const soundEffectsMap = { 'pop': 0, 'whizz': 2, 'fizzle': 4, 'bang': 6 };
 
 function initStars() {
     for (let i = 0; i < 50; i++) {
@@ -181,6 +189,7 @@ window.addEventListener('load', () => {
     power = 0;
 });
 resizeCanvas();
+
 // Sticky_UFD Game - Part 2: Core Functions
 let leaderboardData = [];
 let dustCollectedLastFrame = 0;
@@ -224,24 +233,38 @@ function drawStars() {
     });
 }
 
+// Sticky_UFD Game - Part 2: Core Functions
+// ... (unchanged up to drawUnicorn) ...
 function drawUnicorn() {
     ctx.save();
     ctx.translate(player.x + player.width / 2 + player.shiftX, player.y + player.height / 2 + player.shiftY);
     ctx.rotate(player.angle);
     if (player.direction === 'left') ctx.scale(-1, 1);
-    if (clickState >= 1 && dustImg.complete) ctx.drawImage(dustImg, -player.width / 2, -player.height / 2, player.width, player.height);
-    if (unicornImg.complete) {
+    if (fartAnimationTimer > 0) {
+        fartAnimationTimer -= 1 / 60;
+        if (fartAnimationTimer > 0.1) {
+            if (dustImg.complete) ctx.drawImage(dustImg, -player.width / 2, -player.height / 2, player.width, player.height);
+        } else if (fartAnimationTimer > 0.05) {
+            if (wordsImg.complete) ctx.drawImage(wordsImg, -player.width / 2, -player.height / 2, player.width, player.height);
+        } else if (unicornImg.complete) {
+            ctx.save();
+            if (player.flipped) ctx.scale(-1, 1);
+            ctx.drawImage(unicornImg, -player.width / 2, -player.height / 2, player.width, player.height);
+            ctx.restore();
+        }
+    } else if (unicornImg.complete) {
         ctx.save();
         if (player.flipped) ctx.scale(-1, 1);
         ctx.drawImage(unicornImg, -player.width / 2, -player.height / 2, player.width, player.height);
         ctx.restore();
     }
-    if (clickState === 2 && wordsImg.complete) ctx.drawImage(wordsImg, -player.width / 2, -player.height / 2, player.width, player.height);
     if (shieldActive || shieldCharged) {
-        ctx.strokeStyle = shieldCharged ? 'rgba(255, 255, 0, 0.9)' : 'rgba(255, 255, 255, 0.7)';
+        ctx.fillStyle = 'rgba(173, 216, 230, 0.3)';
+        ctx.strokeStyle = shieldCharged ? 'rgba(192, 192, 192, 0.9)' : 'rgba(192, 192, 192, 0.7)';
         ctx.lineWidth = shieldCharged ? 10 : 5;
         ctx.beginPath();
         ctx.arc(0, 0, player.width / 2 + 20 + (shieldCharged ? Math.sin(Date.now() / 200) * 5 : 0), 0, Math.PI * 2);
+        ctx.fill();
         ctx.stroke();
     }
     ctx.restore();
@@ -256,14 +279,13 @@ function drawUnicorn() {
     }
 }
 
-function generateDust() {
-    const spawnChance = Math.random();
-    const dustCountLocal = spawnChance < 0.5 ? 1 : spawnChance < 0.75 ? 2 : 0;
-    for (let i = 0; i < dustCountLocal; i++) {
+function generateDust(multiplier = 1) { // Added multiplier for ledger
+    const spawnCount = (chillMode ? 3 : 3 + currentLevel) * multiplier;
+    for (let i = 0; i < spawnCount; i++) {
         const dust = {
-            width: 60, height: 60, visible: true, timeLeft: 10,
+            width: 60, height: 60, visible: true, timeLeft: 30, // Increased to 30
             growth: 10, maxGrowth: Math.random() * 40 + 30,
-            value: shrinkActive ? 1 : (Math.random() < 0.5 ? 1 : Math.random() < 0.75 ? 2 : 3),
+            value: shrinkActive ? 1 : (Math.random() < 0.4 ? 1 : Math.random() < 0.8 ? 2 : 3),
             health: 2,
             x: player.x + player.width / 2 + (Math.random() - 0.5) * 400,
             y: player.y + player.height / 2 + (Math.random() - 0.5) * 200,
@@ -271,9 +293,8 @@ function generateDust() {
         };
         dustParticles.push(dust);
     }
-    setTimeout(() => { player.farting = false; }, 400);
+    player.farting = false; // Instant, no timeout
 }
-
 function drawDust() {
     dustParticles.forEach((dust, index) => {
         if (dust.visible) {
@@ -419,13 +440,6 @@ function updateLeaderboard(newScore) {
     }
 }
 
-function playSoundEffect(effectName) {
-    if (!isMuted && !isAllMuted && soundEffectsMap[effectName] !== undefined) {
-        soundEffects.currentTime = soundEffectsMap[effectName];
-        soundEffects.play().catch(() => console.log('Sound blocked'));
-    }
-}
-
 function toggleMusic() {
     if (isMusicOn && !isAllMuted) {
         if (!musicStarted) {
@@ -463,12 +477,21 @@ function triggerThunder() {
         thunderWarning = 0;
         thunderActive = true;
         if (shieldActive) {
-            dusterStrength = dustCollected > 0 ? Math.min(dustCollected, 3) : 0;
-            shieldCharged = dusterStrength > 0;
-            shieldActive = false;
-            shieldTimer = 0;
-            if (dusterStrength === 3) hornsUpTimer = 2;
-            ctx.fillText(shieldCharged ? `Shield charged (S${dusterStrength})!` : 'Shield holds!', canvas.width / 2, 50);
+            shieldHits--;
+            dusterStrength = dustCollected > 0 ? Math.min(dustCollected, 3) : dusterStrength;
+            if (dusterStrength > 0) {
+                shieldCharged = true;
+                shieldActive = false;
+                shieldHits = 0;
+                if (dusterStrength === 3) hornsUpTimer = 2;
+                ctx.fillText(`Shield charged (S${dusterStrength})!`, canvas.width / 2, 50);
+            } else if (shieldHits <= 0) {
+                shieldActive = false;
+                shieldTimer = 0;
+                ctx.fillText('Shield broken by thunder!', canvas.width / 2, 50);
+            } else {
+                ctx.fillText(`Shield holds (${shieldHits} hits left)!`, canvas.width / 2, 50);
+            }
         } else if (!shieldCharged) {
             if (chillMode) {
                 dustParticles.length = 0;
@@ -487,7 +510,7 @@ function triggerThunder() {
         if (thunderWarning) dustCollected++;
     };
 }
-// Sticky_UFD Game - Part 3: Game Loop & Settings
+// Sticky_UFD Game - Part 3A: Setup to Mid-Loop
 setTimeout(() => {
     if (Date.now() - lastClickTime > idleTimeout) playRandomGiggleFart();
 }, Math.floor(Math.random() * (21000 - 7000 + 1)) + 7000);
@@ -495,10 +518,10 @@ setTimeout(() => {
 function drawSettings() {
     if (showSettings) {
         ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-        ctx.fillRect(canvas.width - 200, 10, 190, 210);
+        ctx.fillRect(canvas.width - 200, 10, 190, 240);
         ctx.strokeStyle = '#FF69B4';
         ctx.lineWidth = 3;
-        ctx.strokeRect(canvas.width - 200, 10, 190, 210);
+        ctx.strokeRect(canvas.width - 200, 10, 190, 240);
         ctx.fillStyle = '#FFFFFF';
         ctx.font = '20px Arial';
         ctx.textAlign = 'left';
@@ -508,6 +531,7 @@ function drawSettings() {
         ctx.fillText(`Scene: ${scenes[currentScene].name} (B)`, canvas.width - 190, 130);
         ctx.fillText('Leaderboard (L)', canvas.width - 190, 160);
         ctx.fillText(chillMode ? 'Chill Off (H)' : 'Chill On (H)', canvas.width - 190, 190);
+        ctx.fillText(`Track: ${currentMusicIndex + 1} (T)`, canvas.width - 190, 220);
         ctx.fillStyle = '#FF69B4';
         ctx.beginPath();
         ctx.arc(canvas.width - 20, 30, 15, 0, Math.PI * 2);
@@ -622,7 +646,7 @@ function gameLoop() {
             ctx.fill();
             if (particle.life <= 0) {
                 dustParticles.push({
-                    width: 30, height: 30, visible: true, timeLeft: 10,
+                    width: 30, height: 30, visible: true, timeLeft: 15,
                     growth: 10, maxGrowth: 30, value: 1,
                     health: 1, x: particle.x, y: particle.y,
                     tentacle: 0, driftX: 0, driftY: 0
@@ -675,9 +699,11 @@ function gameLoop() {
             if (shieldTimer >= 5) {
                 shieldActive = false;
                 shieldTimer = 0;
+                shieldHits = 0;
                 ctx.fillText('Shield dropped!', canvas.width / 2, 50);
+            } else {
+                ctx.fillText(`Shield up (${shieldHits} hits left)—collect dust!`, canvas.width / 2, 50);
             }
-            ctx.fillText('Shield up—collect dust!', canvas.width / 2, 50);
         } else if (shieldCharged) {
             shieldTimer += 1 / 60;
             if (shieldTimer >= 10) {
@@ -688,7 +714,7 @@ function gameLoop() {
             }
             ctx.fillText(`Shield charged (S${dusterStrength})—tap X to strike!`, canvas.width / 2, 50);
         }
-
+        // Sticky_UFD Game - Part 3B: Bearome Triggers to End
         if (!chillMode && currentLevel >= 2 && gameDust >= 500 && gameDust - dustCollectedLastFrame <= 500) {
             let bearomeTrigger = Math.floor(Math.random() * 16) + 135;
             if (gameDust >= bearomeTrigger && gameDust - dustCollectedLastFrame < bearomeTrigger && bearomeWarnings < 3) {
@@ -728,6 +754,10 @@ function gameLoop() {
                                     if (!isMuted && !isAllMuted) hoovesDownSound.play().catch(() => console.log('Hooves blocked'));
                                     shrinkActive = true;
                                     shrinkDuration = 10;
+                                    dustParticles.forEach(dust => {
+                                        dust.maxGrowth = Math.max(40, dust.maxGrowth * 0.75);
+                                        dust.value = Math.max(1, dust.value);
+                                    });
                                     for (let i = 0; i < 20; i++) {
                                         glitterParticles.push({
                                             x: Math.random() * canvas.width,
@@ -738,19 +768,19 @@ function gameLoop() {
                                             life: 3
                                         });
                                     }
-                                    for (let j = dustParticles.length - 1; j >= 0; j--) {
-                                        if (dustParticles[j].growth > 50) {
-                                            explodeDust(dustParticles[j].x, dustParticles[j].y, 1);
-                                            dustParticles.splice(j, 1);
-                                        } else {
-                                            dustParticles[j].value = 1;
-                                            dustParticles[j].maxGrowth = 30;
-                                        }
-                                    }
                                     if (shieldActive) {
                                         shieldActive = false;
                                         shieldTimer = 0;
                                         ctx.fillText('Shield shattered by glitter!', canvas.width / 2, 70);
+                                    }
+                                    if (bearomeImg.complete) {
+                                        ctx.drawImage(bearomeImg, 50, 50, 200, 200);
+                                        ctx.strokeStyle = 'rgba(255, 192, 203, 0.7)';
+                                        ctx.lineWidth = 5;
+                                        ctx.beginPath();
+                                        ctx.moveTo(150, 150);
+                                        ctx.quadraticCurveTo(canvas.width / 4, canvas.height / 4, player.x + player.width / 2, player.y + player.height / 2);
+                                        ctx.stroke();
                                     }
                                 }
                                 bearomeWarnings = 0;
@@ -788,7 +818,10 @@ function gameLoop() {
                             } else {
                                 shrinkActive = true;
                                 shrinkDuration = 10;
-                                dustParticles.forEach(dust => dust.value = Math.max(1, dust.value - 1));
+                                dustParticles.forEach(dust => {
+                                    dust.maxGrowth = Math.max(40, dust.maxGrowth * 0.75);
+                                    dust.value = Math.max(1, dust.value);
+                                });
                                 for (let i = 0; i < 50; i++) {
                                     dustPixels.push({
                                         x: canvas.width / 2,
@@ -803,6 +836,15 @@ function gameLoop() {
                                     shieldActive = false;
                                     shieldTimer = 0;
                                     ctx.fillText('Shield shattered by glitter!', canvas.width / 2, 70);
+                                }
+                                if (bearomeImg.complete) {
+                                    ctx.drawImage(bearomeImg, 50, 50, 200, 200);
+                                    ctx.strokeStyle = 'rgba(255, 192, 203, 0.7)';
+                                    ctx.lineWidth = 5;
+                                    ctx.beginPath();
+                                    ctx.moveTo(150, 150);
+                                    ctx.quadraticCurveTo(canvas.width / 4, canvas.height / 4, player.x + player.width / 2, player.y + player.height / 2);
+                                    ctx.stroke();
                                 }
                             }
                             bearomeActive = false;
@@ -885,7 +927,7 @@ function gameLoop() {
         ctx.textAlign = 'center';
         if (chillMode) {
             ctx.fillText('Chill Mode', canvas.width / 2 - 80, 30);
-            ctx.fillStyle = power >= 1 ? '#FFFF00' : 'rgba(255, 255, 255, 0.5)';
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.7)'; // Always clickable, no power check
             ctx.beginPath();
             ctx.arc(canvas.width / 2 + 50, 25, 30, 0, Math.PI * 2);
             ctx.fill();
@@ -936,85 +978,77 @@ function gameLoop() {
     drawLeaderboard();
     requestAnimationFrame(gameLoop);
 }
-
 // Sticky_UFD Game - Part 4: Interactions & Events
-canvas.addEventListener('click', function (event) {
+canvas.addEventListener('click', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+    const y = (e.clientY - rect.top) * (canvas.height / rect.height);
     lastClickTime = Date.now();
-    let rect = canvas.getBoundingClientRect();
-    let x = event.clientX - rect.left;
-    let y = event.clientY - rect.top;
 
     if (isLocked) {
-        if (x >= canvas.width / 2 - 100 && x <= canvas.width / 2 + 100 &&
-            y >= canvas.height / 2 - 50 && y <= canvas.height / 2 + 50) {
-            isLocked = false;
-            showRontoshiSilvermoto = true;
-            rontoshiSilvermotoStep = 0;
-            if (!isMuted && !isAllMuted) buttercupSound.play().catch(() => console.log('Buttercup blocked'));
+        isLocked = false;
+        if (isMusicOn && !isAllMuted && !musicStarted) {
+            backgroundMusic.play().catch(err => console.error('Music blocked:', err));
+            musicStarted = true;
         }
+        showRontoshiSilvermoto = true;
+        rontoshiSilvermotoStep = 0;
+        setTimeout(() => { rontoshiSilvermotoStep = 1; }, 4000);
+        setTimeout(() => { rontoshiSilvermotoStep = 2; }, 8000);
+        setTimeout(() => { showRontoshiSilvermoto = false; rontoshiSilvermotoStep = 3; }, 12000);
         return;
     }
 
     if (!chillMode && player.health <= 0) {
-        if (x >= canvas.width / 2 - 100 && x <= canvas.width / 2 + 100 &&
-            y >= canvas.height / 2 + 20 && y <= canvas.height / 2 + 60) {
-            player.health = 100;
-            gameDust = 0;
-            currentLevel = 1;
-            envMaxDelay = 9;
-            dustParticles.length = 0;
-            power = 0;
-            currentScene = 2;
-            backgroundVideo.src = scenes[currentScene].src;
-            backgroundVideo.play();
-            isDarkMode = false;
-            document.body.classList.remove('dark-mode');
-        }
+        chillDust = 0;
+        gameDust = 0;
+        power = 0;
+        player.health = 100;
+        currentLevel = 1;
+        envMaxDelay = 15;
+        currentScene = 2;
+        backgroundVideo.src = scenes[currentScene].src;
+        backgroundVideo.play().catch(err => console.error('Video blocked:', err));
+        dustParticles.length = 0;
+        glitterParticles.length = 0;
+        dustPixels.length = 0;
+        bearomeThreshold = Math.floor(Math.random() * 251) + 500;
+        bearomeActive = false;
+        bearomeTimer = 0;
+        bearomeWarnings = 0;
+        shrinkActive = false;
+        shrinkDuration = 0;
+        shieldActive = false;
+        shieldCharged = false;
+        shieldTimer = 0;
+        dusterStrength = 0;
+        shieldHits = 0;
+        hornsUpTimer = 0;
         return;
     }
 
-    const muteY = chillMode ? 110 : 160;
-    if (!isLocked && Math.sqrt((x - 105) ** 2 + (y - muteY) ** 2) <= 15) {
-        isAllMuted = !isAllMuted;
-        if (isAllMuted) {
-            soundEffects.pause();
-            fartSounds.forEach(f => { f.pause(); f.currentTime = 0; });
-            giggleSound.pause(); giggleSound.currentTime = 0;
-            oddFartSound.pause(); oddFartSound.currentTime = 0;
-            backgroundMusic.pause();
-            musicStarted = false;
-        } else {
-            if (!isMuted) { }
-            if (isMusicOn) {
-                backgroundMusic.play().catch(err => console.error('Music blocked:', err));
-                musicStarted = true;
-            }
-        }
+    if (showLeaderboard) {
+        showLeaderboard = false;
         return;
     }
 
     if (showSettings) {
-        if (x >= canvas.width - 200 && x <= canvas.width - 10 && y >= 10 && y <= 220) {
+        // Check if click is within settings box
+        if (x >= canvas.width - 200 && x <= canvas.width - 10 && y >= 10 && y <= 250) {
             if (Math.sqrt((x - (canvas.width - 20)) ** 2 + (y - 30) ** 2) <= 15) {
-                showSettings = false;
-                return;
-            }
-            if (y >= 50 && y <= 80) {
+                showSettings = false; // Close button
+            } else if (y >= 50 && y <= 80) {
                 isMuted = !isMuted;
-                if (isMuted) {
-                    fartSounds.forEach(f => { f.pause(); f.currentTime = 0; });
-                    giggleSound.pause(); giggleSound.currentTime = 0;
-                    oddFartSound.pause(); oddFartSound.currentTime = 0;
-                    soundEffects.pause();
-                }
+                localStorage.setItem('isMuted', isMuted);
             } else if (y >= 80 && y <= 110) {
                 isMusicOn = !isMusicOn;
                 toggleMusic();
+                localStorage.setItem('isMusicOn', isMusicOn);
             } else if (y >= 110 && y <= 140) {
                 currentScene = (currentScene + 1) % scenes.length;
                 if (scenes[currentScene].type === 'video') {
                     backgroundVideo.src = scenes[currentScene].src;
-                    backgroundVideo.play();
+                    backgroundVideo.play().catch(err => console.error('Video blocked:', err));
                 } else {
                     backgroundVideo.pause();
                     backgroundVideo.src = '';
@@ -1027,337 +1061,312 @@ canvas.addEventListener('click', function (event) {
                 showSettings = false;
             } else if (y >= 170 && y <= 200) {
                 chillMode = !chillMode;
+                chillDust = 0;
+                gameDust = 0;
+                power = 0;
+                player.health = 100;
+                currentLevel = 1;
+                envMaxDelay = chillMode ? 15 : 15;
+                currentScene = chillMode ? 1 : 2;
                 if (chillMode) {
-                    player.health = 100;
-                    currentLevel = 1;
-                    envMaxDelay = 15;
-                    currentScene = 1;
                     backgroundVideo.pause();
                     backgroundVideo.src = '';
                     isDarkMode = true;
                     document.body.classList.add('dark-mode');
                 } else {
-                    player.health = 100;
-                    currentLevel = 1;
-                    envMaxDelay = 9;
-                    currentScene = 2;
                     backgroundVideo.src = scenes[currentScene].src;
-                    backgroundVideo.play();
+                    backgroundVideo.play().catch(err => console.error('Video blocked:', err));
                     isDarkMode = false;
                     document.body.classList.remove('dark-mode');
                 }
+                dustParticles.length = 0;
+                glitterParticles.length = 0;
+                dustPixels.length = 0;
+                bearomeThreshold = Math.floor(Math.random() * 251) + 500;
+                bearomeActive = false;
+                bearomeTimer = 0;
+                bearomeWarnings = 0;
+                shrinkActive = false;
+                shrinkDuration = 0;
+                shieldActive = false;
+                shieldCharged = false;
+                shieldTimer = 0;
+                dusterStrength = 0;
+                shieldHits = 0;
+                hornsUpTimer = 0;
+            } else if (y >= 200 && y <= 230) {
+                backgroundMusic.pause();
+                backgroundMusic.currentTime = 0;
+                currentMusicIndex = (currentMusicIndex + 1) % musicTracks.length;
+                backgroundMusic = musicTracks[currentMusicIndex];
+                if (isMusicOn && !isAllMuted) {
+                    backgroundMusic.play().catch(err => console.error('Music blocked:', err));
+                    musicStarted = true;
+                }
             }
+            return; // Prevent closing if clicking a button
+        } else {
+            showSettings = false; // Click outside closes
             return;
         }
     }
 
-    if (x >= canvas.width - 150 && x <= canvas.width - 10 && y >= 10 && y <= 40) {
-        showSettings = !showSettings;
-        return;
-    }
-
-    if (x >= canvas.width / 2 - 100 && x <= canvas.width / 2 + 100 && y >= canvas.height - 30 && y <= canvas.height - 10) {
-        window.open('https://unicornfartdust.com', '_blank');
-        return;
-    }
-
-    if (showLeaderboard) {
-        showLeaderboard = false;
-        return;
-    }
-
-    if (showRontoshiSilvermoto && rontoshiSilvermotoStep < 3) {
-        rontoshiSilvermotoStep++;
-        return;
-    }
-
-    if (chillMode && Math.sqrt((x - (canvas.width / 2 + 50)) ** 2 + (y - 25) ** 2) <= 30) {
-        if (power >= 1) {
-            chillMode = false;
-            gameDust = 0;
-            currentLevel = 1;
-            envMaxDelay = 9;
-            envTimer = 0;
-            player.health = 100;
-            dustParticles.length = 0;
-            currentScene = 2;
-            backgroundVideo.src = scenes[currentScene].src;
-            backgroundVideo.play();
-            isDarkMode = false;
-            document.body.classList.remove('dark-mode');
-        }
-        return;
-    }
-
-    if (Math.sqrt((x - 150) ** 2 + (y - (canvas.height - 150)) ** 2) <= 50) {
+    let buttonClicked = false;
+    if (Math.sqrt((x - (canvas.width - 20)) ** 2 + (y - 30) ** 2) <= 20 && !isLocked) {
+        showSettings = true;
+        buttonClicked = true;
+    } else if (chillMode && Math.sqrt((x - (canvas.width / 2 + 50)) ** 2 + (y - 25) ** 2) <= 30) {
+        chillMode = false;
+        chillDust = 0;
+        gameDust = 0;
+        power = 0;
+        player.health = 100;
+        currentLevel = 1;
+        envMaxDelay = 15;
+        currentScene = 2;
+        backgroundVideo.src = scenes[currentScene].src;
+        backgroundVideo.play().catch(err => console.error('Video blocked:', err));
+        isDarkMode = false;
+        document.body.classList.remove('dark-mode');
+        dustParticles.length = 0;
+        glitterParticles.length = 0;
+        dustPixels.length = 0;
+        bearomeThreshold = Math.floor(Math.random() * 251) + 500;
+        bearomeActive = false;
+        bearomeTimer = 0;
+        bearomeWarnings = 0;
+        shrinkActive = false;
+        shrinkDuration = 0;
+        shieldActive = false;
+        shieldCharged = false;
+        shieldTimer = 0;
+        dusterStrength = 0;
+        shieldHits = 0;
+        hornsUpTimer = 0;
+        buttonClicked = true;
+    } else if (Math.sqrt((x - 150) ** 2 + (y - (canvas.height - 150)) ** 2) <= 50) {
         if (power >= 1 && !shieldActive && !shieldCharged) {
             shieldActive = true;
+            shieldHits = 3;
             power = 0;
             powerChargeTime = 10;
             ctx.fillText('Shield up!', canvas.width / 2, 50);
         } else if (shieldCharged) {
+            const strikeRadius = (150 + dusterStrength * 50) * (canvas.width / 800);
+            dustParticles.forEach((dust, index) => {
+                if (dust.visible) {
+                    const dx = dust.x - (player.x + player.width / 2);
+                    const dy = dust.y - (player.y + player.height / 2);
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    if (distance <= strikeRadius) {
+                        explodeDust(dust.x, dust.y, dust.value);
+                        if (chillMode) chillDust += dust.value;
+                        else gameDust += dust.value;
+                        dustParticles.splice(index, 1);
+                    }
+                }
+            });
+            if (!isMuted && !isAllMuted) diamondHoofSound.play().catch(() => console.log('Diamond blocked'));
+            shakeTimer = 0.5;
             shieldCharged = false;
             shieldTimer = 0;
-            let collected = 0;
-            let strikeRadius = hornsUpTimer > 0 ? 600 : 300;
-            for (let j = dustParticles.length - 1; j >= 0; j--) {
-                const dust = dustParticles[j];
+            dusterStrength = 0;
+            powerChargeTime = 15;
+            if (gameDust >= 500 && !chillMode && rontoshiSilvermotoStep === 3) {
+                showRontoshiSilvermoto = true;
+                rontoshiSilvermotoStep = 4;
+                setTimeout(() => { showRontoshiSilvermoto = false; }, 4000);
+            }
+        }
+        buttonClicked = true;
+    } else if (Math.sqrt((x - (canvas.width - 150)) ** 2 + (y - (canvas.height - 150)) ** 2) <= 50 && power >= 1 && !collectAllReady) {
+        collectAllReady = true;
+        let collected = false;
+        dustParticles.forEach((dust, index) => {
+            if (dust.visible) {
+                collected = true;
+                explodeDust(dust.x, dust.y, dust.value);
+                if (chillMode) chillDust += dust.value;
+                else gameDust += dust.value;
+                dustParticles.splice(index, 1);
+            }
+        });
+        if (collected && !isMuted && !isAllMuted) buttercupSound.play().catch(() => console.log('Buttercup blocked'));
+        power = 0;
+        powerChargeTime = collected ? 15 : 10;
+        setTimeout(() => { collectAllReady = false; }, 500);
+        buttonClicked = true;
+    }
+
+    if (!buttonClicked) {
+        if (chillMode && dustParticles.length < 15 || !chillMode && dustParticles.length < (15 + currentLevel * 3)) { // Raised cap to 15
+            generateDust();
+        }
+        player.farting = true;
+        fartAnimationTimer = 0.3;
+        if (!isMuted && !isAllMuted) fartSounds[fartIndex].play().catch(() => console.log('Fart blocked'));
+        fartIndex = (fartIndex + 1) % fartSounds.length;
+        if (thunderWarning) window.collectDustDuringStorm();
+
+        dustParticles.forEach((dust, index) => {
+            if (dust.visible) {
                 const dx = dust.x - x;
                 const dy = dust.y - y;
-                if (dust.visible && Math.sqrt(dx * dx + dy * dy) <= strikeRadius) {
-                    collected += dust.value * (1 + dusterStrength * 0.3);
-                    explodeDust(dust.x, dust.y, dust.value);
-                    dustParticles.splice(j, 1);
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                const collectRadius = hornsUpTimer > 0 ? 150 : 75;
+                if (distance <= collectRadius * (canvas.width / 800)) {
+                    dust.health--;
+                    if (dust.health <= 0) {
+                        explodeDust(dust.x, dust.y, dust.value);
+                        if (chillMode) chillDust += dust.value;
+                        else gameDust += dust.value;
+                        dustParticles.splice(index, 1);
+                        if (!isMuted && !isAllMuted) {
+                            fartSounds[fartIndex].play().catch(() => console.log('Fart blocked'));
+                            fartIndex = (fartIndex + 1) % fartSounds.length;
+                        }
+                    }
                 }
             }
-            if (shrinkActive) {
-                shrinkActive = false;
-                shrinkDuration = 0;
-                glitterParticles.length = 0;
-                ctx.fillText('Shield Strike ends glitter bomb!', canvas.width / 2, 70);
-            }
-            if (chillMode) chillDust += Math.floor(collected); else gameDust += Math.floor(collected);
-            ctx.fillText(`Shield Strike (S${dusterStrength}): +${Math.floor(collected)}!`, canvas.width / 2, 50);
-            updateLeaderboard(chillMode ? chillDust : gameDust);
-            if (dusterStrength === 3) hornsUpTimer = 2;
-            dusterStrength = 0;
-        }
-        return;
-    }
+        });
 
-    if (Math.sqrt((x - (canvas.width - 150)) ** 2 + (y - (canvas.height - 150)) ** 2) <= 50 && power >= 1 && !collectAllReady) {
-        collectAllReady = true;
-        power = 0;
-        powerChargeTime = 10;
-        let collected = 0;
-        let spearDust = 0;
-        for (let j = dustParticles.length - 1; j >= 0; j--) {
-            if (dustParticles[j].visible) {
-                collected += dustParticles[j].value;
-                explodeDust(dustParticles[j].x, dustParticles[j].y, dustParticles[j].value);
-                dustParticles.splice(j, 1);
-            }
+        if (chillMode && chillDust >= 50 && rontoshiSilvermotoStep === 0) {
+            showRontoshiSilvermoto = true;
+            rontoshiSilvermotoStep = 1;
+            setTimeout(() => { showRontoshiSilvermoto = false; }, 4000);
         }
-        for (let j = spears.length - 1; j >= 0; j--) {
-            spearDust += 5;
-            spears.splice(j, 1);
-        }
-        if (chillMode) chillDust += collected + spearDust; else gameDust += collected + spearDust;
-        ctx.fillText(`Swept up ${collected} dust + ${spearDust} spear bonus!`, canvas.width / 2, 110);
-        collectAllReady = false;
         updateLeaderboard(chillMode ? chillDust : gameDust);
-        return;
-    }
-
-    player.farting = true;
-    generateDust();
-    if (!isMuted && !isAllMuted) {
-        fartSounds[fartIndex].pause();
-        fartSounds[fartIndex].currentTime = 0;
-        fartSounds[fartIndex].play().catch(() => console.log('Fart blocked'));
-        fartIndex = (fartIndex + 1) % 3;
-    }
-    if (!isAllMuted && isMusicOn && !musicStarted) {
-        backgroundMusic.play().catch(err => console.error('Music blocked:', err));
-        musicStarted = true;
-    }
-    player.shiftX = Math.random() * 10 - 5;
-    player.shiftY = -10;
-    player.shiftDuration = 0.3;
-    player.angle = Math.random() * 0.2 - 0.1;
-    clickState = 1;
-    setTimeout(() => { clickState = 2; }, 150);
-    setTimeout(() => { clickState = 0; player.farting = false; }, 300);
-    if (!isMuted && !isAllMuted) setTimeout(() => playSoundEffect('pop'), 200);
-
-    for (let i = dustParticles.length - 1; i >= 0; i--) {
-        const dust = dustParticles[i];
-        const pulseRadius = dust.width * (dust.growth / dust.maxGrowth);
-        if (dust.visible && x >= dust.x - pulseRadius && x <= dust.x + pulseRadius && y >= dust.y - pulseRadius && y <= dust.y + pulseRadius) {
-            dust.health--;
-            if (dust.health <= 0) {
-                if (chillMode) chillDust += dust.value; else gameDust += dust.value;
-                if (dust.value === 3 && shieldCharged) {
-                    shieldTimer = Math.max(0, shieldTimer - 0.7);
-                    ctx.fillStyle = '#FFFF00';
-                    ctx.fillText('+0.7s Shield', dust.x, dust.y - 60);
-                }
-                if (dust.value === 3 && player.health < 100 && !chillMode) {
-                    player.health = Math.min(100, player.health + 5);
-                    ctx.fillStyle = '#00FF00';
-                    ctx.fillText('+5 Health', dust.x, dust.y - 40);
-                }
-                explodeDust(dust.x, dust.y, dust.value);
-                ctx.font = '20px Arial';
-                ctx.fillStyle = '#ffcc00';
-                ctx.fillText(`+${dust.value} Dust`, dust.x, dust.y - 20);
-                dustParticles.splice(i, 1);
-                playSoundEffect('pop');
-                if (power < 1) {
-                    let remainingTime = powerChargeTime * (1 - power);
-                    remainingTime = Math.max(0, remainingTime - 1);
-                    power = 1 - (remainingTime / powerChargeTime);
-                }
-                if (shieldActive && thunderWarning) {
-                    window.collectDustDuringStorm();
-                }
-                if ((chillMode ? chillDust : gameDust) >= 100 && (chillMode ? chillDust : gameDust) - dust.value < 100 && !isMuted && !isAllMuted) {
-                    fanfareSound.play().catch(() => console.log('Fanfare blocked'));
-                    setTimeout(() => {
-                        showRontoshiSilvermoto = true;
-                        rontoshiSilvermotoStep = 3;
-                        dusterSound.play().catch(() => console.log('Duster blocked'));
-                    }, 1000);
-                }
-                if ((chillMode ? chillDust : gameDust) >= 1000 && (chillMode ? chillDust : gameDust) - dust.value < 1000 && !isMuted && !isAllMuted) {
-                    showRontoshiSilvermoto = true;
-                    rontoshiSilvermotoStep = 4;
-                    diamondHoofSound.play().catch(() => console.log('Diamond blocked'));
-                }
-                updateLeaderboard(chillMode ? chillDust : gameDust);
-            } else {
-                ctx.fillStyle = '#FF0000';
-                ctx.fillText('Crack!', dust.x, dust.y - 20);
-                playSoundEffect('fizzle');
-            }
-            break;
-        }
     }
 });
 
-document.addEventListener('keydown', (event) => {
-    const key = event.key.toLowerCase();
-    if (key === 'm') {
-        if (isAllMuted) return;
+document.addEventListener('keydown', (e) => {
+    const key = e.key.toLowerCase();
+    if (key === 'tab') {
+        e.preventDefault();
+        if (!isLocked) showSettings = !showSettings;
+    } else if (key === 'm') {
         isMuted = !isMuted;
-        if (isMuted) {
-            fartSounds.forEach(f => { f.pause(); f.currentTime = 0; });
-            giggleSound.pause(); giggleSound.currentTime = 0;
-            oddFartSound.pause(); oddFartSound.currentTime = 0;
-            soundEffects.pause();
-        }
-    }
-    if (key === 'n') {
+        localStorage.setItem('isMuted', isMuted);
+    } else if (key === 'n') {
         isMusicOn = !isMusicOn;
         toggleMusic();
-    }
-    if (key === 'b') {
+        localStorage.setItem('isMusicOn', isMusicOn);
+    } else if (key === 'b') {
         currentScene = (currentScene + 1) % scenes.length;
         if (scenes[currentScene].type === 'video') {
             backgroundVideo.src = scenes[currentScene].src;
-            backgroundVideo.play();
+            backgroundVideo.play().catch(err => console.error('Video blocked:', err));
         } else {
             backgroundVideo.pause();
             backgroundVideo.src = '';
         }
         isDarkMode = scenes[currentScene].name === 'Night';
         document.body.classList.toggle('dark-mode', isDarkMode);
-    }
-    if (key === 'l') {
+    } else if (key === 'l' && !isLocked) {
         showLeaderboard = !showLeaderboard;
         if (showLeaderboard) fetchLeaderboard();
-        showSettings = false;
-    }
-    if (key === 's' && power >= 1 && !shieldActive && !shieldCharged) {
-        shieldActive = true;
-        power = 0;
-        powerChargeTime = 10;
-        ctx.fillText('Shield up!', canvas.width / 2, 50);
-    }
-    if (key === 'x' && shieldCharged) {
-        shieldCharged = false;
-        shieldTimer = 0;
-        let collected = 0;
-        let strikeRadius = hornsUpTimer > 0 ? 600 : 300;
-        for (let j = dustParticles.length - 1; j >= 0; j--) {
-            const dust = dustParticles[j];
-            const dx = dust.x - (canvas.width / 2);
-            const dy = dust.y - (canvas.height / 2);
-            if (dust.visible && Math.sqrt(dx * dx + dy * dy) <= strikeRadius) {
-                collected += dust.value * (1 + dusterStrength * 0.3);
-                explodeDust(dust.x, dust.y, dust.value);
-                dustParticles.splice(j, 1);
-            }
-        }
-        if (shrinkActive) {
-            shrinkActive = false;
-            shrinkDuration = 0;
-            glitterParticles.length = 0;
-            ctx.fillText('Shield Strike ends glitter bomb!', canvas.width / 2, 70);
-        }
-        if (chillMode) chillDust += Math.floor(collected); else gameDust += Math.floor(collected);
-        ctx.fillText(`Shield Strike (S${dusterStrength}): +${Math.floor(collected)}!`, canvas.width / 2, 50);
-        updateLeaderboard(chillMode ? chillDust : gameDust);
-        if (dusterStrength === 3) hornsUpTimer = 2;
-        dusterStrength = 0;
-    }
-    if (key === 'c' && power >= 1 && !collectAllReady) {
-        collectAllReady = true;
-        power = 0;
-        powerChargeTime = 10;
-        let collected = 0;
-        let spearDust = 0;
-        for (let j = dustParticles.length - 1; j >= 0; j--) {
-            if (dustParticles[j].visible) {
-                collected += dustParticles[j].value;
-                explodeDust(dustParticles[j].x, dustParticles[j].y, dustParticles[j].value);
-                dustParticles.splice(j, 1);
-            }
-        }
-        for (let j = spears.length - 1; j >= 0; j--) {
-            spearDust += 5;
-            spears.splice(j, 1);
-        }
-        if (chillMode) chillDust += collected + spearDust; else gameDust += collected + spearDust;
-        ctx.fillText(`Swept up ${collected} dust + ${spearDust} spear bonus!`, canvas.width / 2, 110);
-        collectAllReady = false;
-        updateLeaderboard(chillMode ? chillDust : gameDust);
-    }
-    if (key === 'tab') {
-        showSettings = !showSettings;
-        event.preventDefault();
-    }
-    if (key === 'escape') {
-        showSettings = false;
-    }
-    if (key === 'h') {
+    } else if (key === 'h' && !isLocked) {
         chillMode = !chillMode;
+        chillDust = 0;
+        gameDust = 0;
+        power = 0;
+        player.health = 100;
+        currentLevel = 1;
+        envMaxDelay = chillMode ? 15 : 15;
+        currentScene = chillMode ? 1 : 2;
         if (chillMode) {
-            player.health = 100;
-            currentLevel = 1;
-            envMaxDelay = 15;
-            currentScene = 1;
             backgroundVideo.pause();
             backgroundVideo.src = '';
             isDarkMode = true;
             document.body.classList.add('dark-mode');
         } else {
-            player.health = 100;
-            currentLevel = 1;
-            envMaxDelay = 9;
-            currentScene = 2;
             backgroundVideo.src = scenes[currentScene].src;
-            backgroundVideo.play();
+            backgroundVideo.play().catch(err => console.error('Video blocked:', err));
             isDarkMode = false;
             document.body.classList.remove('dark-mode');
         }
-    }
-    if (key === 'g' && chillMode && power >= 1) {
-        chillMode = false;
-        gameDust = 0;
-        currentLevel = 1;
-        envMaxDelay = 9;
-        envTimer = 0;
-        player.health = 100;
         dustParticles.length = 0;
-        currentScene = 2;
-        backgroundVideo.src = scenes[currentScene].src;
-        backgroundVideo.play();
-        isDarkMode = false;
-        document.body.classList.remove('dark-mode');
+        glitterParticles.length = 0;
+        dustPixels.length = 0;
+        bearomeThreshold = Math.floor(Math.random() * 251) + 500;
+        bearomeActive = false;
+        bearomeTimer = 0;
+        bearomeWarnings = 0;
+        shrinkActive = false;
+        shrinkDuration = 0;
+        shieldActive = false;
+        shieldCharged = false;
+        shieldTimer = 0;
+        dusterStrength = 0;
+        shieldHits = 0;
+        hornsUpTimer = 0;
+    } else if (key === 't' && showSettings) {
+        backgroundMusic.pause();
+        backgroundMusic.currentTime = 0;
+        currentMusicIndex = (currentMusicIndex + 1) % musicTracks.length;
+        backgroundMusic = musicTracks[currentMusicIndex];
+        if (isMusicOn && !isAllMuted) {
+            backgroundMusic.play().catch(err => console.error('Music blocked:', err));
+            musicStarted = true;
+        }
+    } else if (key === 's' && power >= 1 && !shieldActive && !shieldCharged) {
+        shieldActive = true;
+        shieldHits = 3;
+        power = 0;
+        powerChargeTime = 10;
+        ctx.fillText('Shield up!', canvas.width / 2, 50);
+    } else if (key === 'x' && shieldCharged) {
+        const strikeRadius = (150 + dusterStrength * 50) * (canvas.width / 800);
+        dustParticles.forEach((dust, index) => {
+            if (dust.visible) {
+                const dx = dust.x - (player.x + player.width / 2);
+                const dy = dust.y - (player.y + player.height / 2);
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                if (distance <= strikeRadius) {
+                    explodeDust(dust.x, dust.y, dust.value);
+                    if (chillMode) chillDust += dust.value;
+                    else gameDust += dust.value;
+                    dustParticles.splice(index, 1);
+                }
+            }
+        });
+        if (!isMuted && !isAllMuted) diamondHoofSound.play().catch(() => console.log('Diamond blocked'));
+        shakeTimer = 0.5;
+        shieldCharged = false;
+        shieldTimer = 0;
+        dusterStrength = 0;
+        powerChargeTime = 15;
+        if (gameDust >= 500 && !chillMode && rontoshiSilvermotoStep === 3) {
+            showRontoshiSilvermoto = true;
+            rontoshiSilvermotoStep = 4;
+            setTimeout(() => { showRontoshiSilvermoto = false; }, 4000);
+        }
+    } else if (key === 'c' && power >= 1 && !collectAllReady) {
+        collectAllReady = true;
+        let collected = false;
+        dustParticles.forEach((dust, index) => {
+            if (dust.visible) {
+                collected = true;
+                explodeDust(dust.x, dust.y, dust.value);
+                if (chillMode) chillDust += dust.value;
+                else gameDust += dust.value;
+                dustParticles.splice(index, 1);
+            }
+        });
+        if (collected && !isMuted && !isAllMuted) buttercupSound.play().catch(() => console.log('Buttercup blocked'));
+        power = 0;
+        powerChargeTime = collected ? 15 : 10;
+        setTimeout(() => { collectAllReady = false; }, 500);
     }
-    lastClickTime = Date.now();
 });
 
-unicornImg.onload = function () { gameLoop(); };
-unicornImg.onerror = () => console.error('Unicorn image failed');
+canvas.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    const touch = e.touches[0];
+    const rect = canvas.getBoundingClientRect();
+    const x = (touch.clientX - rect.left) * (canvas.width / rect.width);
+    const y = (touch.clientY - rect.top) * (canvas.height / rect.height);
+    canvas.dispatchEvent(new MouseEvent('click', { clientX: touch.clientX, clientY: touch.clientY }));
+}, { passive: false });
+
+requestAnimationFrame(gameLoop);
