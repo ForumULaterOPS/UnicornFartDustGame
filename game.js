@@ -1,4 +1,4 @@
-﻿// Sticky_UFD Game - Part 1: Setup & Assets (March 25, 2025)
+﻿// Sticky_UFD Game - Complete Fixed Script (April 02, 2025)
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
@@ -14,30 +14,27 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-// Music tracks
+// Audio
 const musicTracks = [
     new Audio('assets/music1.mp3'),
     new Audio('assets/music2.mp3'),
     new Audio('assets/music3.mp3')
 ];
 let currentMusicIndex = 1;
-musicTracks.forEach(track => {
-    track.loop = true;
-    track.volume = 0.5;
-});
+musicTracks.forEach(track => { track.loop = true; track.volume = 0.5; });
 let backgroundMusic = musicTracks[currentMusicIndex];
 let musicStarted = false;
-
-const fartSounds = [new Audio('assets/fart.mp3'), new Audio('assets/fart.mp3'), new Audio('assets/fart.mp3')];
+const fartSounds = [
+    new Audio('assets/fart.mp3'),
+    new Audio('assets/fart.mp3'),
+    new Audio('assets/fart.mp3')
+];
 fartSounds.forEach(fart => fart.volume = 0.10);
 let fartIndex = 0;
 const fanfareSound = new Audio('assets/fanfare.mp3');
-const giggleSound = new Audio('assets/giggle.mp3');
-giggleSound.volume = 0.10;
-const oddFartSound = new Audio('assets/oddfart.mp3');
-oddFartSound.volume = 0.10;
+const giggleSound = new Audio('assets/giggle.mp3'); giggleSound.volume = 0.10;
+const oddFartSound = new Audio('assets/oddfart.mp3'); oddFartSound.volume = 0.10;
 const buttercupSound = new Audio('assets/buttercup.mp3');
-const dusterSound = new Audio('assets/duster.mp3');
 const diamondHoofSound = new Audio('assets/diamond_hoof.mp3');
 const hornTingleSound = new Audio('assets/horn_tingle.mp3');
 const feelSomethingSound = new Audio('assets/feel_something.mp3');
@@ -46,6 +43,7 @@ const bearomeLaughSound = new Audio('assets/bearome_laugh.mp3');
 const hoovesDownSound = new Audio('assets/hooves_down.mp3');
 const closeCallSound = new Audio('assets/close_call.mp3');
 
+// Video and Images
 const backgroundVideo = document.createElement('video');
 let scenes = [
     { type: 'static', name: 'Day', color: '#4682B4' },
@@ -63,21 +61,20 @@ backgroundVideo.play().catch(err => console.error('Video blocked:', err));
 let videoReady = false;
 backgroundVideo.addEventListener('canplaythrough', () => { videoReady = true; });
 
-const unicornImg = new Image(); unicornImg.src = 'assets/unicorn.png';
-const dustImg = new Image(); dustImg.src = 'assets/dust.png';
-const wordsImg = new Image(); wordsImg.src = 'assets/words.png';
+const unicornVideo = document.createElement('video');
+unicornVideo.src = 'assets/unicornDance.webm';
+unicornVideo.loop = true;
+unicornVideo.muted = true;
+const restUnicornImg = new Image(); restUnicornImg.src = 'assets/unicorn.png';
 const rontoshiSilvermotoImg = new Image(); rontoshiSilvermotoImg.src = 'assets/unicorn_wizard.png';
 const bearomeImg = new Image(); bearomeImg.src = 'assets/bearome.png';
-const ledger = new Image(); ledger.src = 'assets/ledger.png';
+const moonPayImg = new Image(); moonPayImg.src = 'assets/MoonPay.png'; moonPayImg.onerror = () => console.log('MoonPay.png not found');
+const ledgerImg = new Image(); ledgerImg.src = 'assets/Ledger.png'; ledgerImg.onerror = () => console.log('Ledger.png not found');
 
-const player = {
-    x: 0, y: 0, width: 200, height: 200, angle: 0, farting: false, direction: 'right',
-    shiftX: 0, shiftY: 0, shiftDuration: 0, flipped: false, health: 100
-};
-
+// Game State
+const player = { x: 0, y: 0, width: 200, height: 200, angle: 0, farting: false, direction: 'right', shiftX: 0, shiftY: 0, shiftDuration: 0, flipped: false, health: 100 };
 const dustParticles = [];
 const dustPixels = [];
-const spears = [];
 const glitterParticles = [];
 const stars = [];
 let chillDust = 0;
@@ -89,7 +86,7 @@ let showLeaderboard = false;
 let isLocked = true;
 let showRontoshiSilvermoto = false;
 let rontoshiSilvermotoStep = 0;
-let bearomeThreshold = Math.floor(Math.random() * 251) + 500;
+let bearomeThreshold = 200;
 let bearomeActive = false;
 let bearomeTimer = 0;
 let bearomeWarnings = 0;
@@ -101,7 +98,6 @@ let isAllMuted = false;
 let isMusicOn = true;
 let lastClickTime = Date.now();
 const idleTimeout = 3000;
-let fartAnimationTimer = 0; // Only timer for animation
 let showSettings = false;
 let playerName = localStorage.getItem('playerName') || null;
 if (!playerName) {
@@ -109,7 +105,6 @@ if (!playerName) {
     if (playerName.charAt(0) !== '$') playerName = '$' + playerName;
     localStorage.setItem('playerName', playerName);
 }
-
 let shieldActive = false;
 let shieldTimer = 0;
 let shieldCharged = false;
@@ -123,11 +118,15 @@ let thunderWarning = 0;
 let thunderActive = false;
 let ufdPrice = 'Loading...';
 let currentLevel = chillMode ? 1 : 1;
-
-const skyColorLight = '#4682B4';
-const skyColorDark = '#1a1a2e';
-const cloudColorLight = '#FFFFFF';
-const cloudColorDark = '#4A4A4A';
+let moonshotCharge = 0;
+const moonshotChargeTime = 23;
+let moonshotActive = false;
+let moonshotTimer = 0;
+let shieldBonusCharge = 0;
+let shieldBonusActive = false;
+let shieldBonusTimer = 0;
+let dustSpawnQueue = [];
+let dustSpawnTimer = 0;
 
 function initStars() {
     for (let i = 0; i < 50; i++) {
@@ -145,9 +144,7 @@ initStars();
 function fetchUFDPrice() {
     fetch('https://api.coingecko.com/api/v3/simple/price?ids=unicorn-fart-dust&vs_currencies=usd')
         .then(response => response.json())
-        .then(data => {
-            ufdPrice = data['unicorn-fart-dust']?.usd ? `UFD: $${data['unicorn-fart-dust'].usd}` : 'UFD: N/A';
-        })
+        .then(data => { ufdPrice = data['unicorn-fart-dust']?.usd ? `UFD: $${data['unicorn-fart-dust'].usd}` : 'UFD: N/A'; })
         .catch(() => ufdPrice = 'UFD: Error');
 }
 fetchUFDPrice();
@@ -183,14 +180,8 @@ function resizeCanvas() {
     }
 }
 window.addEventListener('resize', resizeCanvas);
-window.addEventListener('load', () => {
-    chillDust = 0;
-    gameDust = 0;
-    power = 0;
-});
 resizeCanvas();
 
-// Sticky_UFD Game - Part 2: Core Functions
 let leaderboardData = [];
 let dustCollectedLastFrame = 0;
 
@@ -199,10 +190,10 @@ function drawBackground() {
     if (scene.type === 'video' && videoReady && backgroundVideo.readyState >= 2) {
         ctx.drawImage(backgroundVideo, 0, 0, canvas.width, canvas.height);
     } else {
-        ctx.fillStyle = scene.color || skyColorDark;
+        ctx.fillStyle = scene.color || '#1a1a2e';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         if (scene.name === 'Night') drawStars();
-        ctx.fillStyle = scene.name === 'Night' ? cloudColorDark : cloudColorLight;
+        ctx.fillStyle = scene.name === 'Night' ? '#4A4A4A' : '#FFFFFF';
         ctx.save();
         ctx.translate(120, 110);
         ctx.beginPath();
@@ -233,29 +224,20 @@ function drawStars() {
     });
 }
 
-// Sticky_UFD Game - Part 2: Core Functions
-// ... (unchanged up to drawUnicorn) ...
 function drawUnicorn() {
     ctx.save();
     ctx.translate(player.x + player.width / 2 + player.shiftX, player.y + player.height / 2 + player.shiftY);
     ctx.rotate(player.angle);
     if (player.direction === 'left') ctx.scale(-1, 1);
-    if (fartAnimationTimer > 0) {
-        fartAnimationTimer -= 1 / 60;
-        if (fartAnimationTimer > 0.1) {
-            if (dustImg.complete) ctx.drawImage(dustImg, -player.width / 2, -player.height / 2, player.width, player.height);
-        } else if (fartAnimationTimer > 0.05) {
-            if (wordsImg.complete) ctx.drawImage(wordsImg, -player.width / 2, -player.height / 2, player.width, player.height);
-        } else if (unicornImg.complete) {
-            ctx.save();
-            if (player.flipped) ctx.scale(-1, 1);
-            ctx.drawImage(unicornImg, -player.width / 2, -player.height / 2, player.width, player.height);
-            ctx.restore();
-        }
-    } else if (unicornImg.complete) {
+    const idleTime = Date.now() - lastClickTime;
+    if (idleTime < 3000 && unicornVideo.readyState >= 2) {
+        unicornVideo.play().catch(() => { });
+        ctx.drawImage(unicornVideo, -player.width / 2, -player.height / 2, player.width, player.height);
+    } else if (restUnicornImg.complete) {
+        unicornVideo.pause();
         ctx.save();
         if (player.flipped) ctx.scale(-1, 1);
-        ctx.drawImage(unicornImg, -player.width / 2, -player.height / 2, player.width, player.height);
+        ctx.drawImage(restUnicornImg, -player.width / 2, -player.height / 2, player.width, player.height);
         ctx.restore();
     }
     if (shieldActive || shieldCharged) {
@@ -279,22 +261,32 @@ function drawUnicorn() {
     }
 }
 
-function generateDust(multiplier = 1) { // Added multiplier for ledger
-    const spawnCount = (chillMode ? 3 : 3 + currentLevel) * multiplier;
-    for (let i = 0; i < spawnCount; i++) {
-        const dust = {
-            width: 60, height: 60, visible: true, timeLeft: 30, // Increased to 30
+function generateDust(multiplier = 1) {
+    const spawnCount = Math.floor(Math.random() * 5) + 3;
+    dustSpawnQueue = [];
+    for (let i = 0; i < spawnCount * multiplier; i++) {
+        dustSpawnQueue.push({
+            width: 60, height: 60, visible: true, timeLeft: 30,
             growth: 10, maxGrowth: Math.random() * 40 + 30,
-            value: shrinkActive ? 1 : (Math.random() < 0.4 ? 1 : Math.random() < 0.8 ? 2 : 3),
+            value: shrinkActive ? 1 : (Math.random() < 0.4 ? 1 : Math.random() < 0.8 ? 2 : 3) * (shieldBonusActive ? 2 : 1),
             health: 2,
             x: player.x + player.width / 2 + (Math.random() - 0.5) * 400,
             y: player.y + player.height / 2 + (Math.random() - 0.5) * 200,
-            tentacle: 0, driftX: 0, driftY: 0
-        };
-        dustParticles.push(dust);
+            tentacle: 0, driftX: 0, driftY: 0,
+            delay: i * (3 / spawnCount)
+        });
     }
-    player.farting = false; // Instant, no timeout
+    dustSpawnTimer = 0;
+    player.farting = false;
 }
+
+function updateDustSpawn() {
+    dustSpawnTimer += 1 / 60;
+    while (dustSpawnQueue.length > 0 && dustSpawnTimer >= dustSpawnQueue[0].delay) {
+        dustParticles.push(dustSpawnQueue.shift());
+    }
+}
+
 function drawDust() {
     dustParticles.forEach((dust, index) => {
         if (dust.visible) {
@@ -309,7 +301,7 @@ function drawDust() {
             dust.timeLeft -= 1 / 30;
             const baseRadius = dust.width * (dust.growth / dust.maxGrowth);
             let color;
-            switch (dust.value) {
+            switch (dust.value / (shieldBonusActive ? 2 : 1)) {
                 case 1: color = 'rgba(128, 0, 128, 0.8)'; break;
                 case 2: color = 'rgba(0, 128, 0, 0.8)'; break;
                 case 3: color = 'rgba(218, 165, 32, 0.8)'; break;
@@ -346,7 +338,7 @@ function drawDust() {
 function explodeDust(x, y, value) {
     const pixelCount = 30;
     let color;
-    switch (value) {
+    switch (value / (shieldBonusActive ? 2 : 1)) {
         case 1: color = 'rgba(128, 0, 128, 0.8)'; break;
         case 2: color = 'rgba(0, 128, 0, 0.8)'; break;
         case 3: color = 'rgba(218, 165, 32, 0.8)'; break;
@@ -418,9 +410,7 @@ function fetchLeaderboard() {
             } else {
                 querySnapshot.forEach((doc) => {
                     const data = doc.data();
-                    if (data.name.includes(chillMode ? 'Chill' : 'L')) {
-                        leaderboardData.push(data);
-                    }
+                    leaderboardData.push(data);
                 });
             }
             if (leaderboardData.length === 0) leaderboardData.push({ name: 'No scores yet!', score: '' });
@@ -434,8 +424,7 @@ function updateLeaderboard(newScore) {
             name: `${playerName} (${chillMode ? 'Chill' : 'L' + currentLevel})`,
             score: newScore,
             timestamp: firebase.firestore.FieldValue.serverTimestamp()
-        })
-            .then(() => console.log('Score saved:', playerName, newScore))
+        }).then(() => console.log('Score saved:', playerName, newScore))
             .catch(err => console.error('Leaderboard error:', err));
     }
 }
@@ -467,15 +456,23 @@ function playRandomGiggleFart() {
 function triggerThunder() {
     thunderWarning = 1;
     let dustCollected = 0;
-    setTimeout(() => { thunderWarning = 0; }, 300);
-    setTimeout(() => { thunderWarning = 1; }, 400);
-    setTimeout(() => { thunderWarning = 0; }, 600);
-    setTimeout(() => { thunderWarning = 1; }, 700);
-    setTimeout(() => { thunderWarning = 0; }, 800);
-    setTimeout(() => { thunderWarning = 1; }, 900);
+    const warningSequence = [
+        { delay: 300, warning: 0 },
+        { delay: 400, warning: 1 },
+        { delay: 600, warning: 0 },
+        { delay: 700, warning: 1 },
+        { delay: 800, warning: 0 },
+        { delay: 900, warning: 1 }
+    ];
+    warningSequence.forEach(({ delay, warning }) => {
+        setTimeout(() => { thunderWarning = warning; }, delay);
+    });
+
     setTimeout(() => {
         thunderWarning = 0;
         thunderActive = true;
+        console.log('Thunder striking!');
+        dustParticles.length = 0;
         if (shieldActive) {
             shieldHits--;
             dusterStrength = dustCollected > 0 ? Math.min(dustCollected, 3) : dusterStrength;
@@ -484,33 +481,68 @@ function triggerThunder() {
                 shieldActive = false;
                 shieldHits = 0;
                 if (dusterStrength === 3) hornsUpTimer = 2;
+                console.log('Shield charged with strength:', dusterStrength);
                 ctx.fillText(`Shield charged (S${dusterStrength})!`, canvas.width / 2, 50);
             } else if (shieldHits <= 0) {
                 shieldActive = false;
                 shieldTimer = 0;
-                ctx.fillText('Shield broken by thunder!', canvas.width / 2, 50);
+                for (let i = 0; i < 20; i++) {
+                    dustPixels.push({ x: player.x + player.width / 2, y: player.y + player.height / 2, vx: (Math.random() - 0.5) * 15, vy: (Math.random() - 0.5) * 15, color: 'rgba(192, 192, 192, 0.8)', timeLeft: 0.5 });
+                }
+                if (!isMuted && !isAllMuted) uhOhSound.play();
+                ctx.fillText('Shield popped by thunder!', canvas.width / 2, 50);
             } else {
                 ctx.fillText(`Shield holds (${shieldHits} hits left)!`, canvas.width / 2, 50);
             }
         } else if (!shieldCharged) {
-            if (chillMode) {
-                dustParticles.length = 0;
-                ctx.fillText('Thunder zaps bubbles!', canvas.width / 2, 50);
-            } else {
-                dustParticles.length = 0;
+            if (chillMode) ctx.fillText('Thunder zaps all bubbles!', canvas.width / 2, 50);
+            else {
                 player.health -= 20;
                 ctx.fillText('Thunder strikes—ouch!', canvas.width / 2, 50);
             }
         }
-        dustCollected = 0;
-        setTimeout(() => { thunderActive = false; }, 1200);
+        let lightningFade = 1.0;
+        const lightningInterval = setInterval(() => {
+            if (thunderActive) {
+                ctx.strokeStyle = `rgba(255, 255, 0, ${lightningFade})`;
+                ctx.lineWidth = 5;
+                ctx.beginPath();
+                let x = 0, y = Math.random() * canvas.height / 2;
+                ctx.moveTo(x, y);
+                while (x < canvas.width) {
+                    x += Math.random() * 50 + 20;
+                    y += (Math.random() - 0.5) * 100;
+                    if (x > canvas.width) x = canvas.width;
+                    if (y < 0) y = 0; if (y > canvas.height) y = canvas.height;
+                    ctx.lineTo(x, y);
+                }
+                ctx.stroke();
+                lightningFade -= 0.1;
+                if (lightningFade <= 0) {
+                    thunderActive = false;
+                    clearInterval(lightningInterval);
+                }
+            }
+        }, 100);
     }, 1000);
 
-    window.collectDustDuringStorm = () => {
-        if (thunderWarning) dustCollected++;
-    };
+    if (shieldActive) {
+        const stormCollectionInterval = setInterval(() => {
+            if (thunderWarning || thunderActive) {
+                dustParticles.forEach((dust, index) => {
+                    if (dust.visible && Math.random() < 0.3) {
+                        dustCollected++;
+                        explodeDust(dust.x, dust.y, dust.value);
+                        dustParticles.splice(index, 1);
+                    }
+                });
+            } else {
+                clearInterval(stormCollectionInterval);
+            }
+        }, 16);
+    }
 }
-// Sticky_UFD Game - Part 3A: Setup to Mid-Loop
+
 setTimeout(() => {
     if (Date.now() - lastClickTime > idleTimeout) playRandomGiggleFart();
 }, Math.floor(Math.random() * (21000 - 7000 + 1)) + 7000);
@@ -547,7 +579,7 @@ function drawMuteAllButton() {
     ctx.save();
     const yPos = chillMode ? 110 : 160;
     ctx.translate(105, yPos);
-    ctx.fillStyle = isAllMuted ? 'rgba(255, 0, 0, 0.7)' : 'rgba(255, 255, 255, 0.7)';
+    ctx.fillStyle = isAllMuted ? 'rgba(255, 0, 0, 0.7)' : 'rgba(255, 255, 255, 0.5)';
     ctx.beginPath();
     ctx.arc(0, 0, 15, 0, Math.PI * 2);
     ctx.fill();
@@ -575,8 +607,79 @@ function drawMuteAllButton() {
     ctx.restore();
 }
 
+function drawMoonPayButton() {
+    const x = canvas.width - 90;
+    const y = 60;
+    ctx.save();
+    ctx.translate(x, y);
+    let radius = 70;
+    if (moonshotActive) radius += Math.sin(Date.now() / 200) * 5;
+    ctx.fillStyle = moonshotCharge >= 1 && !moonshotActive ? '#FFFF00' : 'rgba(255, 255, 255, 0.5)';
+    ctx.beginPath();
+    ctx.arc(0, 0, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#FF69B4';
+    ctx.lineWidth = 5;
+    ctx.stroke();
+    if (moonPayImg.complete && moonPayImg.naturalWidth !== 0) {
+        const imgWidth = 200; // Adjust to your image size
+        const imgHeight = 80; // Adjust to your image size
+        const scale = moonshotActive ? 1 + Math.sin(Date.now() / 200) * 0.1 : 1;
+        ctx.drawImage(moonPayImg, -imgWidth / 2 * scale, -imgHeight / 2 * scale, imgWidth * scale, imgHeight * scale);
+    } else {
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = '16px Arial';
+        ctx.fillText('MPAY', 0, -10);
+    }
+    ctx.fillStyle = '#000000';
+    ctx.font = '20px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(moonshotActive ? `Auto (${Math.ceil(moonshotTimer)}s)` : 'MoonPay', 0, 40);
+    if (moonshotCharge < 1) {
+        ctx.fillStyle = 'rgba(255, 255, 0, 0.3)';
+        ctx.beginPath();
+        ctx.arc(0, 0, radius - 5, -Math.PI / 2, -Math.PI / 2 + moonshotCharge * 2 * Math.PI);
+        ctx.lineTo(0, 0);
+        ctx.fill();
+    }
+    ctx.restore();
+}
+
+function drawLedgerButton() {
+    const x = 110;
+    const y = chillMode ? 160 : 190;
+    ctx.save();
+    ctx.translate(x, y);
+    let radius = 70;
+    if (shieldBonusActive) radius += Math.sin(Date.now() / 200) * 5;
+    ctx.fillStyle = shieldBonusCharge >= 1 && !shieldBonusActive ? '#FFFF00' : 'rgba(255, 255, 255, 0.5)';
+    ctx.beginPath();
+    ctx.arc(0, 0, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#FF69B4';
+    ctx.lineWidth = 5;
+    ctx.stroke();
+    if (ledgerImg.complete && ledgerImg.naturalWidth !== 0) {
+        const imgWidth = 200; // Adjust to your image size
+        const imgHeight = 80; // Adjust to your image size
+        const scale = shieldBonusActive ? 1 + Math.sin(Date.now() / 200) * 0.1 : 1;
+        ctx.drawImage(ledgerImg, -imgWidth / 2 * scale, -imgHeight / 2 * scale, imgWidth * scale, imgHeight * scale);
+    } else {
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = '16px Arial';
+        ctx.fillText('LEDG', 0, -10);
+    }
+    ctx.fillStyle = '#000000';
+    ctx.font = '20px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(shieldBonusActive ? `Boost (${Math.ceil(shieldBonusTimer)}s)` : 'Ledger', 0, 40);
+    ctx.restore();
+}
+
 function gameLoop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    updateDustSpawn();
+
     if (isLocked) {
         ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -617,22 +720,6 @@ function gameLoop() {
             ctx.fillStyle = '#FFFFFF';
             ctx.fillText('Thunder incoming!', canvas.width / 2, 50);
         }
-        if (thunderActive) {
-            ctx.strokeStyle = 'rgba(255, 255, 0, 0.8)';
-            ctx.lineWidth = 5;
-            ctx.beginPath();
-            let x = 0, y = Math.random() * canvas.height / 2;
-            ctx.moveTo(x, y);
-            while (x < canvas.width) {
-                x += Math.random() * 50 + 20;
-                y += (Math.random() - 0.5) * 100;
-                if (x > canvas.width) x = canvas.width;
-                if (y < 0) y = 0; if (y > canvas.height) y = canvas.height;
-                ctx.lineTo(x, y);
-            }
-            ctx.stroke();
-            setTimeout(() => { thunderActive = false; }, 800);
-        }
         drawDust();
         drawBanner();
 
@@ -647,7 +734,7 @@ function gameLoop() {
             if (particle.life <= 0) {
                 dustParticles.push({
                     width: 30, height: 30, visible: true, timeLeft: 15,
-                    growth: 10, maxGrowth: 30, value: 1,
+                    growth: 10, maxGrowth: 30, value: 1 * (shieldBonusActive ? 2 : 1),
                     health: 1, x: particle.x, y: particle.y,
                     tentacle: 0, driftX: 0, driftY: 0
                 });
@@ -656,10 +743,72 @@ function gameLoop() {
         });
 
         if (power < 1) {
-            power += (1 / powerChargeTime) / 60;
+            power += (1 / powerChargeTime) / 60 * (shieldBonusActive ? 2 : 1);
             if (power > 1) power = 1;
         }
-
+        if (moonshotCharge < 1 && !moonshotActive) {
+            moonshotCharge += (1 / moonshotChargeTime) / 60;
+            if (moonshotCharge > 1) moonshotCharge = 1;
+        }
+        if (moonshotActive) {
+            moonshotTimer -= 1 / 60;
+            if (moonshotTimer <= 0) {
+                moonshotActive = false;
+                moonshotCharge = 0;
+            } else if (Math.random() < 0.1) {
+                generateDust();
+                if (!isMuted && !isAllMuted) fartSounds[fartIndex].play();
+                fartIndex = (fartIndex + 1) % fartSounds.length;
+            }
+        }
+        if (shieldBonusActive) {
+            shieldBonusTimer -= 1 / 60;
+            if (shieldBonusTimer <= 0) {
+                shieldBonusActive = false;
+                shieldBonusCharge = 0;
+            }
+            ctx.fillStyle = '#FFFF00';
+            ctx.font = '20px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('x2 Shield & Score!', canvas.width / 2, 70);
+        }
+        if (shieldCharged) {
+            ctx.save();
+            ctx.translate(player.x + player.width / 2, player.y + player.height / 2);
+            const strikeRadius = (150 + dusterStrength * 50) * (canvas.width / 800);
+            ctx.strokeStyle = `rgba(255, 255, 0, ${0.5 + Math.sin(Date.now() / 200) * 0.2})`;
+            ctx.lineWidth = 5;
+            ctx.beginPath();
+            ctx.arc(0, 0, strikeRadius, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+            shieldTimer += 1 / 60;
+            if (shieldTimer >= 10) {
+                shieldCharged = false;
+                shieldTimer = 0;
+                dusterStrength = 0;
+                ctx.fillText('Shield charge lost!', canvas.width / 2, 50);
+            }
+            ctx.fillText(`Shield charged (S${dusterStrength})—tap X to strike!`, canvas.width / 2, 50);
+        }
+        if (hornsUpTimer > 0) {
+            hornsUpTimer -= 1 / 60;
+            ctx.fillStyle = '#FFFF00';
+            ctx.font = '30px Arial';
+            ctx.fillText('Horns Up—Double Dust Radius!', canvas.width / 2, shieldBonusActive ? 90 : 70);
+            if (hornsUpTimer <= 0) dusterStrength = 0;
+        }
+        if (shieldActive) {
+            shieldTimer += 1 / 60;
+            if (shieldTimer >= 5) {
+                shieldActive = false;
+                shieldTimer = 0;
+                shieldHits = 0;
+                ctx.fillText('Shield dropped!', canvas.width / 2, 50);
+            } else {
+                ctx.fillText(`Shield up (${shieldHits} hits left)—collect dust!`, canvas.width / 2, 50);
+            }
+        }
         envTimer += 1 / 60;
         if (envTimer >= envMaxDelay) {
             envTimer = Math.random() * envMaxDelay;
@@ -686,35 +835,6 @@ function gameLoop() {
                 backgroundVideo.play();
             }
         }
-
-        if (hornsUpTimer > 0) {
-            hornsUpTimer -= 1 / 60;
-            ctx.fillStyle = '#FFFF00';
-            ctx.font = '30px Arial';
-            ctx.fillText('Horns Up—Double Dust Radius!', canvas.width / 2, 70);
-            if (hornsUpTimer <= 0) dusterStrength = 0;
-        }
-        if (shieldActive) {
-            shieldTimer += 1 / 60;
-            if (shieldTimer >= 5) {
-                shieldActive = false;
-                shieldTimer = 0;
-                shieldHits = 0;
-                ctx.fillText('Shield dropped!', canvas.width / 2, 50);
-            } else {
-                ctx.fillText(`Shield up (${shieldHits} hits left)—collect dust!`, canvas.width / 2, 50);
-            }
-        } else if (shieldCharged) {
-            shieldTimer += 1 / 60;
-            if (shieldTimer >= 10) {
-                shieldCharged = false;
-                shieldTimer = 0;
-                dusterStrength = 0;
-                ctx.fillText('Shield charge lost!', canvas.width / 2, 50);
-            }
-            ctx.fillText(`Shield charged (S${dusterStrength})—tap X to strike!`, canvas.width / 2, 50);
-        }
-        // Sticky_UFD Game - Part 3B: Bearome Triggers to End
         if (!chillMode && currentLevel >= 2 && gameDust >= 500 && gameDust - dustCollectedLastFrame <= 500) {
             let bearomeTrigger = Math.floor(Math.random() * 16) + 135;
             if (gameDust >= bearomeTrigger && gameDust - dustCollectedLastFrame < bearomeTrigger && bearomeWarnings < 3) {
@@ -863,7 +983,6 @@ function gameLoop() {
             ctx.fillStyle = '#FFFFFF';
             ctx.fillText('Glitter Bomb—farts unleashed!', canvas.width / 2, 90);
         }
-
         if (showRontoshiSilvermoto) {
             if (rontoshiSilvermotoStep === 5) {
                 ctx.drawImage(bearomeImg, 50, 50, 200, 200);
@@ -927,7 +1046,7 @@ function gameLoop() {
         ctx.textAlign = 'center';
         if (chillMode) {
             ctx.fillText('Chill Mode', canvas.width / 2 - 80, 30);
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.7)'; // Always clickable, no power check
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
             ctx.beginPath();
             ctx.arc(canvas.width / 2 + 50, 25, 30, 0, Math.PI * 2);
             ctx.fill();
@@ -973,12 +1092,15 @@ function gameLoop() {
 
         if (shakeTimer > 0) ctx.restore();
         dustCollectedLastFrame = chillMode ? chillDust : gameDust;
+
+        drawMoonPayButton();
+        drawLedgerButton();
     }
     drawSettings();
     drawLeaderboard();
     requestAnimationFrame(gameLoop);
 }
-// Sticky_UFD Game - Part 4: Interactions & Events
+
 canvas.addEventListener('click', (e) => {
     const rect = canvas.getBoundingClientRect();
     const x = (e.clientX - rect.left) * (canvas.width / rect.width);
@@ -1024,6 +1146,12 @@ canvas.addEventListener('click', (e) => {
         dusterStrength = 0;
         shieldHits = 0;
         hornsUpTimer = 0;
+        moonshotCharge = 0;
+        moonshotActive = false;
+        moonshotTimer = 0;
+        shieldBonusCharge = 0;
+        shieldBonusActive = false;
+        shieldBonusTimer = 0;
         return;
     }
 
@@ -1033,10 +1161,9 @@ canvas.addEventListener('click', (e) => {
     }
 
     if (showSettings) {
-        // Check if click is within settings box
         if (x >= canvas.width - 200 && x <= canvas.width - 10 && y >= 10 && y <= 250) {
             if (Math.sqrt((x - (canvas.width - 20)) ** 2 + (y - 30) ** 2) <= 15) {
-                showSettings = false; // Close button
+                showSettings = false;
             } else if (y >= 50 && y <= 80) {
                 isMuted = !isMuted;
                 localStorage.setItem('isMuted', isMuted);
@@ -1094,6 +1221,12 @@ canvas.addEventListener('click', (e) => {
                 dusterStrength = 0;
                 shieldHits = 0;
                 hornsUpTimer = 0;
+                moonshotCharge = 0;
+                moonshotActive = false;
+                moonshotTimer = 0;
+                shieldBonusCharge = 0;
+                shieldBonusActive = false;
+                shieldBonusTimer = 0;
             } else if (y >= 200 && y <= 230) {
                 backgroundMusic.pause();
                 backgroundMusic.currentTime = 0;
@@ -1104,9 +1237,9 @@ canvas.addEventListener('click', (e) => {
                     musicStarted = true;
                 }
             }
-            return; // Prevent closing if clicking a button
+            return;
         } else {
-            showSettings = false; // Click outside closes
+            showSettings = false;
             return;
         }
     }
@@ -1143,6 +1276,12 @@ canvas.addEventListener('click', (e) => {
         dusterStrength = 0;
         shieldHits = 0;
         hornsUpTimer = 0;
+        moonshotCharge = 0;
+        moonshotActive = false;
+        moonshotTimer = 0;
+        shieldBonusCharge = 0;
+        shieldBonusActive = false;
+        shieldBonusTimer = 0;
         buttonClicked = true;
     } else if (Math.sqrt((x - 150) ** 2 + (y - (canvas.height - 150)) ** 2) <= 50) {
         if (power >= 1 && !shieldActive && !shieldCharged) {
@@ -1153,30 +1292,56 @@ canvas.addEventListener('click', (e) => {
             ctx.fillText('Shield up!', canvas.width / 2, 50);
         } else if (shieldCharged) {
             const strikeRadius = (150 + dusterStrength * 50) * (canvas.width / 800);
+            const toRemove = [];
             dustParticles.forEach((dust, index) => {
                 if (dust.visible) {
                     const dx = dust.x - (player.x + player.width / 2);
                     const dy = dust.y - (player.y + player.height / 2);
                     const distance = Math.sqrt(dx * dx + dy * dy);
                     if (distance <= strikeRadius) {
+                        toRemove.push(index);
                         explodeDust(dust.x, dust.y, dust.value);
                         if (chillMode) chillDust += dust.value;
                         else gameDust += dust.value;
-                        dustParticles.splice(index, 1);
                     }
                 }
             });
-            if (!isMuted && !isAllMuted) diamondHoofSound.play().catch(() => console.log('Diamond blocked'));
+            toRemove.sort((a, b) => b - a).forEach(index => dustParticles.splice(index, 1));
+            for (let i = 0; i < 30; i++) {
+                dustPixels.push({
+                    x: player.x + player.width / 2,
+                    y: player.y + player.height / 2,
+                    vx: (Math.random() - 0.5) * 20,
+                    vy: (Math.random() - 0.5) * 20,
+                    color: 'rgba(255, 255, 0, 0.8)',
+                    timeLeft: 0.7
+                });
+            }
             shakeTimer = 0.5;
             shieldCharged = false;
             shieldTimer = 0;
             dusterStrength = 0;
             powerChargeTime = 15;
+            shieldBonusCharge = 1;
+            if (!isMuted && !isAllMuted) diamondHoofSound.play().catch(() => console.log('Diamond blocked'));
             if (gameDust >= 500 && !chillMode && rontoshiSilvermotoStep === 3) {
                 showRontoshiSilvermoto = true;
                 rontoshiSilvermotoStep = 4;
                 setTimeout(() => { showRontoshiSilvermoto = false; }, 4000);
             }
+            let strikeFade = 1.0;
+            const strikeInterval = setInterval(() => {
+                ctx.save();
+                ctx.translate(player.x + player.width / 2, player.y + player.height / 2);
+                ctx.strokeStyle = `rgba(255, 255, 0, ${strikeFade})`;
+                ctx.lineWidth = 5;
+                ctx.beginPath();
+                ctx.arc(0, 0, strikeRadius, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.restore();
+                strikeFade -= 0.1;
+                if (strikeFade <= 0) clearInterval(strikeInterval);
+            }, 100);
         }
         buttonClicked = true;
     } else if (Math.sqrt((x - (canvas.width - 150)) ** 2 + (y - (canvas.height - 150)) ** 2) <= 50 && power >= 1 && !collectAllReady) {
@@ -1196,18 +1361,25 @@ canvas.addEventListener('click', (e) => {
         powerChargeTime = collected ? 15 : 10;
         setTimeout(() => { collectAllReady = false; }, 500);
         buttonClicked = true;
+    } else if (Math.sqrt((x - (canvas.width - 90)) ** 2 + (y - 60) ** 2) <= 70 && moonshotCharge >= 1 && !moonshotActive) {
+        moonshotActive = true;
+        moonshotTimer = 7;
+        moonshotCharge = 0;
+        if (!isMuted && !isAllMuted) fanfareSound.play().catch(() => console.log('Fanfare blocked'));
+        buttonClicked = true;
+    } else if (Math.sqrt((x - 110) ** 2 + (y - (chillMode ? 160 : 190)) ** 2) <= 70 && shieldBonusCharge >= 1 && !shieldBonusActive) {
+        shieldBonusActive = true;
+        shieldBonusTimer = 5;
+        shieldBonusCharge = 0;
+        if (!isMuted && !isAllMuted) buttercupSound.play().catch(() => console.log('Buttercup blocked'));
+        buttonClicked = true;
     }
 
     if (!buttonClicked) {
-        if (chillMode && dustParticles.length < 15 || !chillMode && dustParticles.length < (15 + currentLevel * 3)) { // Raised cap to 15
-            generateDust();
-        }
+        generateDust();
         player.farting = true;
-        fartAnimationTimer = 0.3;
         if (!isMuted && !isAllMuted) fartSounds[fartIndex].play().catch(() => console.log('Fart blocked'));
         fartIndex = (fartIndex + 1) % fartSounds.length;
-        if (thunderWarning) window.collectDustDuringStorm();
-
         dustParticles.forEach((dust, index) => {
             if (dust.visible) {
                 const dx = dust.x - x;
@@ -1229,7 +1401,6 @@ canvas.addEventListener('click', (e) => {
                 }
             }
         });
-
         if (chillMode && chillDust >= 50 && rontoshiSilvermotoStep === 0) {
             showRontoshiSilvermoto = true;
             rontoshiSilvermotoStep = 1;
@@ -1300,6 +1471,12 @@ document.addEventListener('keydown', (e) => {
         dusterStrength = 0;
         shieldHits = 0;
         hornsUpTimer = 0;
+        moonshotCharge = 0;
+        moonshotActive = false;
+        moonshotTimer = 0;
+        shieldBonusCharge = 0;
+        shieldBonusActive = false;
+        shieldBonusTimer = 0;
     } else if (key === 't' && showSettings) {
         backgroundMusic.pause();
         backgroundMusic.currentTime = 0;
@@ -1317,30 +1494,56 @@ document.addEventListener('keydown', (e) => {
         ctx.fillText('Shield up!', canvas.width / 2, 50);
     } else if (key === 'x' && shieldCharged) {
         const strikeRadius = (150 + dusterStrength * 50) * (canvas.width / 800);
+        const toRemove = [];
         dustParticles.forEach((dust, index) => {
             if (dust.visible) {
                 const dx = dust.x - (player.x + player.width / 2);
                 const dy = dust.y - (player.y + player.height / 2);
                 const distance = Math.sqrt(dx * dx + dy * dy);
                 if (distance <= strikeRadius) {
+                    toRemove.push(index);
                     explodeDust(dust.x, dust.y, dust.value);
                     if (chillMode) chillDust += dust.value;
                     else gameDust += dust.value;
-                    dustParticles.splice(index, 1);
                 }
             }
         });
-        if (!isMuted && !isAllMuted) diamondHoofSound.play().catch(() => console.log('Diamond blocked'));
+        toRemove.sort((a, b) => b - a).forEach(index => dustParticles.splice(index, 1));
+        for (let i = 0; i < 30; i++) {
+            dustPixels.push({
+                x: player.x + player.width / 2,
+                y: player.y + player.height / 2,
+                vx: (Math.random() - 0.5) * 20,
+                vy: (Math.random() - 0.5) * 20,
+                color: 'rgba(255, 255, 0, 0.8)',
+                timeLeft: 0.7
+            });
+        }
         shakeTimer = 0.5;
         shieldCharged = false;
         shieldTimer = 0;
         dusterStrength = 0;
         powerChargeTime = 15;
+        shieldBonusCharge = 1;
+        if (!isMuted && !isAllMuted) diamondHoofSound.play().catch(() => console.log('Diamond blocked'));
         if (gameDust >= 500 && !chillMode && rontoshiSilvermotoStep === 3) {
             showRontoshiSilvermoto = true;
             rontoshiSilvermotoStep = 4;
             setTimeout(() => { showRontoshiSilvermoto = false; }, 4000);
         }
+        let strikeFade = 1.0;
+        const strikeInterval = setInterval(() => {
+            ctx.save();
+            ctx.translate(player.x + player.width / 2, player.y + player.height / 2);
+            ctx.strokeStyle = `rgba(255, 255, 0, ${strikeFade})`;
+            ctx.lineWidth = 5;
+            ctx.beginPath();
+            ctx.arc(0, 0, strikeRadius, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+            strikeFade -= 0.1;
+            if (strikeFade <= 0) clearInterval(strikeInterval);
+        }, 100);
     } else if (key === 'c' && power >= 1 && !collectAllReady) {
         collectAllReady = true;
         let collected = false;
@@ -1357,6 +1560,15 @@ document.addEventListener('keydown', (e) => {
         power = 0;
         powerChargeTime = collected ? 15 : 10;
         setTimeout(() => { collectAllReady = false; }, 500);
+    } else if (key === ' ' && !isLocked) {
+        isAllMuted = !isAllMuted;
+        if (isAllMuted) {
+            backgroundMusic.pause();
+            musicStarted = false;
+        } else if (isMusicOn) {
+            backgroundMusic.play().catch(err => console.error('Music blocked:', err));
+            musicStarted = true;
+        }
     }
 });
 
