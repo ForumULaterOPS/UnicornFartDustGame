@@ -3,13 +3,13 @@ const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
 const firebaseConfig = {
-    apiKey: "your-api-key",
-    authDomain: "your-auth-domain",
-    projectId: "your-project-id",
-    storageBucket: "your-storage-bucket",
-    messagingSenderId: "your-messaging-sender-id",
-    appId: "your-app-id",
-    measurementId: "your-measurement-id"
+    apiKey: "AIzaSyAZ6YYV0zRQ74hrJ4HwsMUujk9rLRA8utg",
+    authDomain: "unicornclick.firebaseapp.com",
+    projectId: "unicornclick",
+    storageBucket: "unicornclick.firebasestorage.app",
+    messagingSenderId: "1006534504779",
+    appId: "1:1006534504779:web:9094a1b10b5dc067ccf8ce",
+    measurementId: "G-JDNLXJJ2XJ"
 };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
